@@ -1,5 +1,5 @@
 {% set name = "opam" %}
-{% set version = "2.1.3" %}
+{% set version = "2.1.5" %}
 
 
 package:
@@ -8,7 +8,7 @@ package:
 
 source:
   url: https://github.com/ocaml/opam/releases/download/{{ version }}/opam-full-{{ version }}.tar.gz
-  sha256: cb2ab00661566178318939918085aa4b5c35c727df83751fd92d114fdd2fa001
+  sha256: 15e40a75f6fa419164fb20bedd27c851146c2d576a63937cd13b317f3bc2ab93
 
 build:
   number: 0
