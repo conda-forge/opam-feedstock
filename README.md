@@ -1,11 +1,11 @@
-About opam
-==========
+About opam-feedstock
+====================
+
+Feedstock license: [BSD-3-Clause](https://github.com/conda-forge/opam-feedstock/blob/main/LICENSE.txt)
 
 Home: https://github.com/ocaml/opam
 
 Package license: LGPL-2.1-only
-
-Feedstock license: [BSD-3-Clause](https://github.com/conda-forge/opam-feedstock/blob/main/LICENSE.txt)
 
 Summary: A package manager for OCaml
 
@@ -34,7 +34,7 @@ Current build status
               <td>linux_64</td>
               <td>
                 <a href="https://dev.azure.com/conda-forge/feedstock-builds/_build/latest?definitionId=15649&branchName=main">
-                  <img src="https://dev.azure.com/conda-forge/feedstock-builds/_apis/build/status/opam-feedstock?branchName=main&jobName=linux&configuration=linux_64_" alt="variant">
+                  <img src="https://dev.azure.com/conda-forge/feedstock-builds/_apis/build/status/opam-feedstock?branchName=main&jobName=linux&configuration=linux%20linux_64_" alt="variant">
                 </a>
               </td>
             </tr>
