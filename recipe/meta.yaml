@@ -11,7 +11,7 @@ source:
   sha256: cb2ab00661566178318939918085aa4b5c35c727df83751fd92d114fdd2fa001
 
 build:
-  number: 0
+  number: 1
   skip: true  # [win]
   skip: true  # [osx]
 
@@ -31,6 +31,7 @@ requirements:
     - diffutils >=3.7
     - unzip >=6
     - patch >=2.7.6
+    - bubblewrap  # [linux]
 
 test:
   commands:
