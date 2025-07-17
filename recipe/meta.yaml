@@ -22,6 +22,7 @@ requirements:
     - ocaml
     - make
     - patch
+    - ocamlbuild
   host:
   run:
     - rsync
