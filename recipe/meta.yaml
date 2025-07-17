@@ -25,6 +25,7 @@ requirements:
     - make
     - patch
     - ocamlbuild
+    - ocaml-findlib
   host:
   run:
     - rsync
