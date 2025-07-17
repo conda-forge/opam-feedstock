@@ -21,8 +21,7 @@ requirements:
     - {{ compiler('cxx') }} 
     - {{ compiler('c') }}
     - {{ stdlib('c') }}
-    - as
-    - ocaml >= 4.14.2
+    - ocaml >=4.14.2
     - make
     - patch
     - ocamlbuild
