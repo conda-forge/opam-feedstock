@@ -1,5 +1,5 @@
 {% set name = "opam" %}
-{% set version = "2.1.3" %}
+{% set version = "2.3.0" %}
 
 
 package:
@@ -8,7 +8,7 @@ package:
 
 source:
   url: https://github.com/ocaml/opam/releases/download/{{ version }}/opam-full-{{ version }}.tar.gz
-  sha256: cb2ab00661566178318939918085aa4b5c35c727df83751fd92d114fdd2fa001
+  sha256: 506ba76865dc315b67df9aa89e7abd5c1a897a7f0a92d7b2694974fdc532b346
 
 build:
   number: 1
@@ -19,7 +19,10 @@ requirements:
   build:
     # Note: Conda-forge's default compiler versions are being overridden in recipe/conda_build_config.yaml
     - {{ compiler('cxx') }} # C++ definitely needed: https://github.com/ocaml/opam/issues/4452
-    - ocaml >=4.11
+    - {{ compiler('c') }}
+    - {{ stdlib('c') }}
+    - ocaml >=4.14.2
+    - ocamlbuild
     - make >=4.3
     - patch >=2.7.6 # needed by `make ext-lib`
   host:
