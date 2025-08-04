@@ -1,4 +1,4 @@
-cxx_compiler_version:      # [linux]
-  - 9                      # [linux]
-cxx_compiler_version:      # [osx]
+cxx_compiler_version:
+  - 11                     # [osx]
+c_compiler_version:
   - 11                     # [osx]
