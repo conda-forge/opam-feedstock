@@ -15,7 +15,7 @@ build:
 
 requirements:
   build:
-    - ocaml >=5.3.0
+    - ocaml <5
     - if: unix
       then:
         - ${{ compiler('c') }}
