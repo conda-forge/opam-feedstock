@@ -35,7 +35,7 @@ requirements:
     # - ocamlbuild
     # - ocaml-findlib
     - if: unix and not arm64
-      then
+      then:
         - ocamlbuild
         - ocaml-findlib
     
