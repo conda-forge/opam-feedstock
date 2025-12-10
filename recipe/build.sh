@@ -2,6 +2,6 @@
 
 ./configure --prefix=$PREFIX && make && make install
 
-if [[ "${target_platform}" == "linux-"* ]] || [[ "${target_platform}" == "osx-64" ]]; then
-  make libinstall
-fi
+# if [[ "${target_platform}" == "linux-"* ]] || [[ "${target_platform}" == "osx-64" ]]; then
+#   make libinstall
+# fi

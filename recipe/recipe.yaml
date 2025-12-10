@@ -15,7 +15,7 @@ build:
 
 requirements:
   build:
-    - ocaml <5
+    - ocaml >=5.3.0
     - if: unix
       then:
         - ${{ compiler('c') }}
@@ -34,10 +34,6 @@ requirements:
     # We add opam bare for all archs, then later we update below
     # - ocamlbuild
     # - ocaml-findlib
-    - if: unix and not arm64
-      then:
-        - ocamlbuild
-        - ocaml-findlib
     
   host:
   run:
