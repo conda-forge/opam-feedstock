@@ -58,9 +58,18 @@ tests:
   - package_contents:
       bin:
         - opam
+        - opam-installer
+      files:
+        - share/man/man1/opam*
 
   - script:
-      - opam
+      - opam --version | grep ${{ version }}
+
+  # - script:
+  #     - dune runtest tests/reftests
+  #   files:
+  #     source:
+  #       - tests/reftests
 
 about:
   homepage: https://github.com/ocaml/opam
