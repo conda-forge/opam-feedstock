@@ -15,6 +15,7 @@ build:
 
 requirements:
   build:
+    - curl
     - ocaml >=5.3.0
     - if: unix
       then:
