@@ -36,9 +36,10 @@ requirements:
         - m2-make
         - m2-sed
         - m2-which
-    - if: build_platform != target_platform
-      then:
-        - zstd
+    # OCaml compiler has zstd paths embedded from its build environment.
+    # We need zstd in build env so those paths resolve correctly.
+    - if: unix
+      then: zstd
 
     # We need to 2-phase as these do not exist yet for arm64 and non-unix
     # We add opam bare for all archs, then later we update below
