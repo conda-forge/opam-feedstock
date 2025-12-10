@@ -23,12 +23,6 @@ requirements:
         - ${{ stdlib('c') }}
         - make
         - patch
-        
-        # We need to 2-phase as these do not exist yet
-        - if: not arm64
-          then
-            - ocamlbuild
-            - ocaml-findlib
       else:
         - ${{ compiler('m2w64_c') }}
         - ${{ compiler('m2w64_cxx') }}
@@ -37,6 +31,11 @@ requirements:
         - m2-make
 
     # We need to 2-phase as these do not exist yet for arm64 and non-unix
+    # We add opam bare for all archs, then later we update below
+      - if: unix and not arm64
+        then
+          - ocamlbuild
+          - ocaml-findlib
     # - ocamlbuild
     # - ocaml-findlib
     
