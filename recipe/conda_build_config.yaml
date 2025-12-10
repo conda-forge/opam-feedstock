@@ -1,4 +1,0 @@
-cxx_compiler_version:
-  - 11                     # [osx]
-c_compiler_version:
-  - 11                     # [osx]
