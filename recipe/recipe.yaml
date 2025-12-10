@@ -32,12 +32,12 @@ requirements:
 
     # We need to 2-phase as these do not exist yet for arm64 and non-unix
     # We add opam bare for all archs, then later we update below
+    # - ocamlbuild
+    # - ocaml-findlib
     - if: unix and not arm64
       then
         - ocamlbuild
         - ocaml-findlib
-    # - ocamlbuild
-    # - ocaml-findlib
     
   host:
   run:
