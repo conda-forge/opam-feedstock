@@ -1,6 +1,6 @@
 context:
   name: ocaml
-  version: 2.50
+  version: 2.5.0
 
 package:
   name: opam
