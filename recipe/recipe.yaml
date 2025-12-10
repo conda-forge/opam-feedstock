@@ -11,7 +11,7 @@ source:
     sha256: 25fb98f962c4227c1261e142afc68a416778e6e819600bd5ee3ec4a18ae1e238
 
 build:
-  # number: 0
+  number: 0
   # prefix_detection:
   #   force_file_type:
   #     text:
