@@ -15,23 +15,26 @@ build:
 
 requirements:
   build:
+    - ${{ compiler('c') }}
+    - ${{ compiler('cxx') }}
+    - ${{ stdlib('c') }}
     - curl
     - ocaml >=5.3.0
     - if: unix
       then:
-        - ${{ compiler('c') }}
-        - ${{ compiler('cxx') }}
-        - ${{ stdlib('c') }}
         - make
         - patch
         - sed
       else:
-        - ${{ compiler('m2w64_c') }}
-        - ${{ compiler('m2w64_cxx') }}
-        - ${{ stdlib('m2w64_c') }}
+        # - ${{ compiler('m2w64_c') }}
+        # - ${{ compiler('m2w64_cxx') }}
+        # - ${{ stdlib('m2w64_c') }}
         - m2-bash
         - m2-make
         - m2-sed
+    - if: build_platform != target_platform
+      then:
+        - zstd
 
     # We need to 2-phase as these do not exist yet for arm64 and non-unix
     # We add opam bare for all archs, then later we update below
@@ -39,7 +42,9 @@ requirements:
     # - ocaml-findlib
     
   host:
-    - zstd
+    - if: unix
+      then: zstd
+      else: m2-libzstd
   run:
     - rsync
     - git
