@@ -31,6 +31,7 @@ requirements:
         # - ${{ compiler('m2w64_cxx') }}
         # - ${{ stdlib('m2w64_c') }}
         - m2-bash
+        - m2-coreutils
         - m2-gawk
         - m2-grep
         - m2-make
