@@ -19,12 +19,12 @@ requirements:
     - ${{ compiler('c') }}
     - ${{ compiler('cxx') }}
     - ${{ stdlib('c') }}
+    - ${{ m2 }}bash >=5.2
     - ${{ m2 }}make
     - ${{ m2 }}sed
-    - ${{ m2 }}bash >=5.2
     - binutils
     - curl
-    - ocaml >=5.3.0,<5.4.0
+    - ocaml >=5.3.0
     - if: unix
       then:
         - patch
