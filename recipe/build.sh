@@ -22,7 +22,7 @@ if [[ "${target_platform}" == "linux-"* ]] || [[ "${target_platform}" == "osx-"*
   export OPAM_INSTALL_PREFIX="${PREFIX}"
 else
   export OPAM_INSTALL_PREFIX="${_PREFIX_}/Library"
-  BZIP2=$(find ${_BUILD_PREFIX_} ${_PREFIX_} \( -name bzip2 -o -name bzip2.exe \) -type f -perm +111 | head -1)
+  BZIP2=$(find ${_BUILD_PREFIX_} ${_PREFIX_} \( -name bzip2 -o -name bzip2.exe \) \( -type f -o -type l \) -perm /111 | head -1)
   export BUNZIP2="${BZIP2} -d"
   export CC64=false
 fi
@@ -79,7 +79,7 @@ fi
   # export OCAMLPARAM='verbose=1,_'
   # export DUNE_CONFIG__DISPLAY=verbose
 ./configure --help
-./configure --prefix="${OPAM_INSTALL_PREFIX}"  # --with-vendored-deps
+./configure --prefix="${OPAM_INSTALL_PREFIX}" --with-vendored-deps
 make
 make install
 
