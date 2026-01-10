@@ -42,7 +42,7 @@ else
 #   fi
   
   export BUNZIP2="${BZIP2} -d"
-  export CC64=false
+  # export CC64=false
   echo "BUNZIP: ${BUNZIP2}"
 fi
 echo "OCAMLLIB=${OCAMLLIB}"
