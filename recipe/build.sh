@@ -29,10 +29,12 @@ if [[ "${target_platform}" == "linux-"* ]] || [[ "${target_platform}" == "osx-"*
   export OPAM_INSTALL_PREFIX="${PREFIX}"
 else
   export OPAM_INSTALL_PREFIX="${_PREFIX_}/Library"
-  BUNZIP2=$(find ${_BUILD_PREFIX_} ${_PREFIX_} \( -name bunzip2 -o -name bunzip2.exe \) \( -type f -o -type l \) -perm /111 | head -1)
-  if [[ -f $(dirname ${BUNZIP2})/bunzip2 ]]; then
-    cp ${BUNZIP2} $(dirname ${BUNZIP2})/bunzip2
-    ls -l ${BUNZIP2} $(dirname ${BUNZIP2})/bunzip2
+  BZIP2=$(find ${_BUILD_PREFIX_} ${_PREFIX_} \( -name bzip2 -o -name bzip2.exe \) \( -type f -o -type l \) -perm /111 | head -1)
+  if [[ ! -f $(dirname ${BZIP2})/bunzip2 ]]; then
+    cat > $(dirname ${BZIP2})/bunzip2 << 'EOF'
+@echo off
+${BZIP2} -d %*
+EOF
   fi
   
   export BUNZIP2="${BZIP2} -d"

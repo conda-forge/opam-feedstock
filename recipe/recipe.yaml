@@ -34,10 +34,10 @@ requirements:
       then:
         - patch
       else:
+        - ${{ m2 }}bzip2
         - ${{ m2 }}coreutils
         - ${{ m2 }}diffutils
         - ${{ m2 }}which
-        - bzip2
     # OCaml compiler has zstd paths embedded from its build environment.
     # We need zstd in build env so those paths resolve correctly.
     - if: unix
