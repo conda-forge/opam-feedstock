@@ -51,7 +51,6 @@ fi
   echo "=== Full LDFLAGS line ==="
   grep "^LDFLAGS" "${OCAMLLIB}/Makefile.config" || echo "No LDFLAGS found"
   echo "=== end debug ==="
-  strings "${OCAML_PREFIX}/bin/ocamlopt" | grep -E "BYTECCLIBS|ZSTD|lib@" | head -10
   ls -la "${OCAMLLIB}/Makefile.config"
   # export OCAMLPARAM='verbose=1,_'
   # export DUNE_CONFIG__DISPLAY=verbose
