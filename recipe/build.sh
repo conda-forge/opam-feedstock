@@ -3,7 +3,13 @@
 # OCaml has hardcoded placeholder paths (~264 chars) baked into the binary for standard_library.
 # This causes command line corruption when OCaml constructs linker commands.
 # Override with OCAMLLIB to use actual BUILD_PREFIX path.
-export OCAMLLIB="${BUILD_PREFIX}/lib/ocaml"
+if [[ "${target_platform}" == "linux-"* ]] || [[ "${target_platform}" == "osx-"* ]]; then
+  export OCAMLLIB="${BUILD_PREFIX}/lib/ocaml"
+  export OPAM_INSTALL_PREFIX="${PREFIX}"
+else
+  export OCAMLLIB="${_BUILD_PREFIX_}/Library/lib/ocaml"
+  export OPAM_INSTALL_PREFIX="${_PREFIX_}/Library"
+fi
 echo "OCAMLLIB=${OCAMLLIB}"
 
 # Verify OCaml can find its libraries
@@ -25,15 +31,16 @@ if [[ "${target_platform}" == "osx-"* ]]; then
     BUILD_LIB="${BUILD_PREFIX}/lib"
     HOST_LIB="${PREFIX}/lib"
 
-    # # Backup and fix ld.conf if it exists and contains placeholder paths
-    # if [[ -f "${OCAML_LIB}/ld.conf" ]]; then
-    #     echo "Original ld.conf:"
-    #     cat "${OCAML_LIB}/ld.conf"
-    #     # Replace placeholder paths with BUILD_PREFIX (where zstd should be in build env)
-    #     sed -i.bak "s|.*/host_env_placehold[^/]*/lib|${BUILD_LIB}|g" "${OCAML_LIB}/ld.conf"
-    #     echo "Fixed ld.conf:"
-    #     cat "${OCAML_LIB}/ld.conf"
-    # fi
+    # Backup and fix ld.conf if it exists and contains placeholder paths
+    if [[ -f "${OCAML_LIB}/ld.conf" ]]; then
+        echo "Original ld.conf:"
+        cat "${OCAML_LIB}/ld.conf"
+        # Replace placeholder paths with BUILD_PREFIX (where zstd should be in build env)
+        sed -i.bak "s|.*/host_env_placehold[^/]*/lib|${BUILD_LIB}|g" "${OCAML_LIB}/ld.conf"
+        sed -i.bak "s|.*/host_env_placehold[^/]*/lib|${BUILD_LIB}|g" "${OCAML_LIB}/Makefile.config"
+        echo "Fixed ld.conf:"
+        cat "${OCAML_LIB}/ld.conf"
+    fi
 
     # # Fix Makefile.config if it contains placeholder paths
     # if [[ -f "${OCAML_LIB}/Makefile.config" ]]; then
@@ -65,7 +72,8 @@ fi
   # export OCAMLPARAM='verbose=1,_'
   # export DUNE_CONFIG__DISPLAY=verbose
   export CC64=false
-./configure --prefix=$PREFIX --with-vendored-deps
+./configure --help
+./configure --prefix="${OPAM_INSTALL_PREFIX}" --with-vendored-deps
 make
 make install
 
