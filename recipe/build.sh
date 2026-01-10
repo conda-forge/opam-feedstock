@@ -16,10 +16,8 @@ else
   export BUILD_LIB="${_BUILD_PREFIX_}/Library/lib"
   export HOST_LIB="${_PREFIX_}/Library/lib"
 fi
-# -L<bad path to>lib
-sed -i.bak "s|-L[^ ]*_env[^ ]*lib|-L${BUILD_LIB}|g" "${OCAMLLIB}/ld.conf" "${OCAMLLIB}/Makefile.config"
-# rpath,<bad path to>lib (covers lib(/|\)ocaml
-sed -i.bak "s|[^ ,]*_env[^ ]*lib|${BUILD_LIB}|g" "${OCAMLLIB}/ld.conf" "${OCAMLLIB}/Makefile.config"
+# ( |L|,)<bad path to>lib (covers lib(/|\)ocaml
+sed -i.bak "s|\([ L,]\)[^ ,]*_env[^ ]*lib|\1${BUILD_LIB}|g" "${OCAMLLIB}/ld.conf" "${OCAMLLIB}/Makefile.config"
 echo "OCAMLLIB=${OCAMLLIB}"
 
 # ==============================================================================
