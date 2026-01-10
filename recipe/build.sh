@@ -16,8 +16,10 @@ else
   export BUILD_LIB="${_BUILD_PREFIX_}/Library/lib"
   export HOST_LIB="${_PREFIX_}/Library/lib"
 fi
-sed -i.bak "s|-L[^ ]*_env[^ ]*lib|-L${BUILD_LIB}/lib|g" "${OCAMLLIB}/ld.conf" "${OCAMLLIB}/Makefile.config"
-sed -i.bak "s|[^ ]*_env[^ ]*lib[/\\]ocaml|${OCAMLLIB}|g" "${OCAMLLIB}/ld.conf" "${OCAMLLIB}/Makefile.config"
+# -L<bad path to>lib
+sed -i.bak "s|-L[^ ]*_env[^ ]*lib|-L${BUILD_LIB}|g" "${OCAMLLIB}/ld.conf" "${OCAMLLIB}/Makefile.config"
+# rpath,<bad path to>lib (covers lib(/|\)ocaml
+sed -i.bak "s|[^ ,]*_env[^ ]*lib|${BUILD_LIB}|g" "${OCAMLLIB}/ld.conf" "${OCAMLLIB}/Makefile.config"
 echo "OCAMLLIB=${OCAMLLIB}"
 
 # ==============================================================================
@@ -50,11 +52,10 @@ fi
   echo "=== Full LDFLAGS line ==="
   grep "^LDFLAGS" "${OCAMLLIB}/Makefile.config" || echo "No LDFLAGS found"
   echo "=== end debug ==="
-  strings "${BUILD_PREFIX}/bin/ocamlopt" | grep -E "BYTECCLIBS|ZSTD|lib@" | head -10
+  strings "${OCAML_PREFIX}/bin/ocamlopt" | grep -E "BYTECCLIBS|ZSTD|lib@" | head -10
   ls -la "${OCAMLLIB}/Makefile.config"
   # export OCAMLPARAM='verbose=1,_'
   # export DUNE_CONFIG__DISPLAY=verbose
-./configure --help
 ./configure --prefix="${OPAM_INSTALL_PREFIX}" --with-vendored-deps
 make
 make install
