@@ -12,12 +12,13 @@ if [[ "${target_platform}" == "linux-"* ]] || [[ "${target_platform}" == "osx-"*
   export BUILD_LIB="${BUILD_PREFIX}/lib"
   export HOST_LIB="${PREFIX}/lib"
 else
+  export OCAML_PREFIX="${_BUILD_PREFIX_}/Library/bin"
   export OCAMLLIB="${_BUILD_PREFIX_}/Library/lib/ocaml"
   export BUILD_LIB="${_BUILD_PREFIX_}/Library/lib"
   export HOST_LIB="${_PREFIX_}/Library/lib"
 fi
 # ( |L|,)<bad path to>lib (covers lib(/|\)ocaml
-sed -i.bak "s|\([ L,]\)[^ ,]*_env[^ ]*lib|\1${BUILD_LIB}|g" "${OCAMLLIB}/ld.conf" "${OCAMLLIB}/Makefile.config"
+sed -i "s#\(-L| |,)[^ ,]*_env[^ ]*lib#\1${BUILD_LIB}#g" "${OCAMLLIB}/ld.conf" "${OCAMLLIB}/Makefile.config"
 echo "OCAMLLIB=${OCAMLLIB}"
 
 # ==============================================================================

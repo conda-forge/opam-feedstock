@@ -20,6 +20,7 @@ requirements:
     - ${{ compiler('cxx') }}
     - ${{ stdlib('c') }}
     - ${{ m2 }}bash >=5.2
+    - ${{ m2 }}findutils
     - ${{ m2 }}gawk
     - ${{ m2 }}grep
     - ${{ m2 }}make
