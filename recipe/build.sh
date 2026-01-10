@@ -9,9 +9,15 @@ IFS=$'\n\t'
 # Override with OCAMLLIB to use actual BUILD_PREFIX path.
 if [[ "${target_platform}" == "linux-"* ]] || [[ "${target_platform}" == "osx-"* ]]; then
   export OCAMLLIB="${BUILD_PREFIX}/lib/ocaml"
+  export BUILD_LIB="${BUILD_PREFIX}/lib"
+  export HOST_LIB="${PREFIX}/lib"
 else
   export OCAMLLIB="${_BUILD_PREFIX_}/Library/lib/ocaml"
+  export BUILD_LIB="${_BUILD_PREFIX_}/Library/lib"
+  export HOST_LIB="${_PREFIX_}/Library/lib"
 fi
+sed -i.bak "s|-L[^ ]*_env[^ ]*lib|-L${BUILD_LIB}/lib|g" "${OCAMLLIB}/ld.conf" "${OCAMLLIB}/Makefile.config"
+sed -i.bak "s|[^ ]*_env[^ ]*lib[/\\]ocaml|${OCAMLLIB}|g" "${OCAMLLIB}/ld.conf" "${OCAMLLIB}/Makefile.config"
 echo "OCAMLLIB=${OCAMLLIB}"
 
 # ==============================================================================
@@ -32,39 +38,9 @@ echo "OCAMLLIB=${OCAMLLIB}"
 # The OCaml compiler stores library paths in its config that include placeholder paths
 # that weren't properly relocated. We need to ensure the linker can find zstd.
 if [[ "${target_platform}" == "osx-"* ]]; then
-    # Show OCaml's configuration for debugging
-    ocamlc -config | grep -i lib || true
-
-    # Check both BUILD_PREFIX (where OCaml is) and PREFIX (where zstd might be)
-    # OCaml is in build env, zstd might be in build or host env
-    BUILD_LIB="${BUILD_PREFIX}/lib"
-    HOST_LIB="${PREFIX}/lib"
-
-    # Backup and fix ld.conf if it exists and contains placeholder paths
-    if [[ -f "${OCAMLLIB}/ld.conf" ]]; then
-        echo "Original ld.conf:"
-        cat "${OCAMLLIB}/ld.conf"
-        # Replace placeholder paths with BUILD_PREFIX (where zstd should be in build env)
-        sed -i.bak "s|.*/host_env_placehold[^/]*/lib|${BUILD_LIB}|g" "${OCAMLLIB}/ld.conf"
-        sed -i.bak "s|.*/host_env_placehold[^/]*/lib|${BUILD_LIB}|g" "${OCAMLLIB}/Makefile.config"
-        echo "Fixed ld.conf:"
-        cat "${OCAMLLIB}/ld.conf"
-    fi
-
-    # # Fix Makefile.config if it contains placeholder paths
-    # if [[ -f "${OCAMLLIB}/Makefile.config" ]]; then
-    #     sed -i.bak "s|.*/host_env_placehold[^/]*/lib|${BUILD_LIB}|g" "${OCAMLLIB}/Makefile.config"
-    # fi
-
-    # Ensure linker can find zstd via environment - check both build and host prefixes
-    export LIBRARY_PATH="${BUILD_LIB}:${HOST_LIB}${LIBRARY_PATH:+:$LIBRARY_PATH}"
-    export LDFLAGS="-L${BUILD_LIB} -L${HOST_LIB} ${LDFLAGS:-}"
-
-    # echo "LIBRARY_PATH=${LIBRARY_PATH}"
-    # echo "LDFLAGS=${LDFLAGS}"
-    # echo "Checking for zstd:"
-    # ls -la "${BUILD_LIB}"/libzstd* 2>/dev/null || echo "No zstd in BUILD_PREFIX"
-    # ls -la "${HOST_LIB}"/libzstd* 2>/dev/null || echo "No zstd in PREFIX"
+  # Ensure linker can find zstd via environment - check both build and host prefixes
+  export LIBRARY_PATH="${BUILD_LIB}:${HOST_LIB}${LIBRARY_PATH:+:$LIBRARY_PATH}"
+  export LDFLAGS="-L${BUILD_LIB} -L${HOST_LIB} ${LDFLAGS:-}"
 fi
 
   echo "=== OCaml Makefile.config ZSTD/BYTECCLIBS ==="
@@ -72,7 +48,7 @@ fi
   echo "=== Check for any @ in Makefile.config ==="
   grep "@" "${OCAMLLIB}/Makefile.config" || echo "No @ found"
   echo "=== Full LDFLAGS line ==="
-  grep "^LDFLAGS" "${OCAMLLIB}/Makefile.config"
+  grep "^LDFLAGS" "${OCAMLLIB}/Makefile.config" || echo "No LDFLAGS found"
   echo "=== end debug ==="
   strings "${BUILD_PREFIX}/bin/ocamlopt" | grep -E "BYTECCLIBS|ZSTD|lib@" | head -10
   ls -la "${OCAMLLIB}/Makefile.config"
