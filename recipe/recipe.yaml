@@ -24,7 +24,9 @@ requirements:
     - ${{ m2 }}sed
     - binutils
     - curl
-    - ocaml >=5.3.0
+    - ocaml >=5.3.0 *_0
+    # - ocaml >=5.3.0
+    - pkg-config
     - if: unix
       then:
         - patch
