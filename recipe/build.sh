@@ -43,7 +43,6 @@ else
   
   export BUNZIP2="${BZIP2} -d"
   # export CC64=false
-  echo "BUNZIP: ${BUNZIP2}"
 fi
 echo "OCAMLLIB=${OCAMLLIB}"
 
@@ -66,7 +65,8 @@ fi
   ls -la "${OCAMLLIB}/Makefile.config"
   # export OCAMLPARAM='verbose=1,_'
   # export DUNE_CONFIG__DISPLAY=verbose
-./configure --prefix="${OPAM_INSTALL_PREFIX}" --with-vendored-deps
+./configure --prefix="${OPAM_INSTALL_PREFIX}" --with-vendored-deps || { cat config.log; exit 1 }
+sed -i '/(rule/,/(action.*opam-putenv/d' src/core/dune
 make
 make install
 
