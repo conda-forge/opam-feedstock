@@ -53,13 +53,11 @@ if [[ "${target_platform}" != "linux-"* ]] && [[ "${target_platform}" != "osx-"*
   cat src/core/dune
   echo "=== end debug ==="
 
-  # Diagnostic: Check what dune thinks the os_type is
-  echo "=== dune os_type diagnostic ==="
-  echo "os_type:" $(dune eval '%{os_type}' 2>&1 || echo "eval failed")
-  echo "ocaml_version:" $(dune eval '%{ocaml_version}' 2>&1 || echo "eval failed")
-  echo "system:" $(dune eval '%{system}' 2>&1 || echo "eval failed")
-  echo "architecture:" $(dune eval '%{architecture}' 2>&1 || echo "eval failed")
-  echo "=== end dune diagnostic ==="
+  # Diagnostic: Check what dune/ocaml thinks the platform is
+  echo "=== platform diagnostic ==="
+  echo "ocaml Sys.os_type:" $(ocaml -e 'print_string Sys.os_type' 2>&1 || echo "failed")
+  echo "ocaml Sys.win32:" $(ocaml -e 'print_string (string_of_bool Sys.win32)' 2>&1 || echo "failed")
+  echo "=== end diagnostic ==="
 
   # Windows: Pre-create generated files that dune has trouble with
   # These must be valid OCaml matching the .mli interfaces
@@ -68,8 +66,8 @@ if [[ "${target_platform}" != "linux-"* ]] && [[ "${target_platform}" != "osx-"*
   cp src/core/opamStubs.ocaml5.ml src/core/opamStubs.ml
   cp src/core/opamWin32Stubs.win32.ml src/core/opamWin32Stubs.ml
 
-  # Create c-libraries.sexp (lists C libraries to link)
-  echo '()' > src/core/c-libraries.sexp
+  # Create c-libraries.sexp with Windows libraries (see shell/context_flags.ml)
+  echo '(-ladvapi32 -lgdi32 -luser32 -lshell32 -lole32 -luuid -luserenv)' > src/core/c-libraries.sexp
 
   # Create self-contained opam_stubs.c by inlining the #included C files
   pushd src/core
