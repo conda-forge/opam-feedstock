@@ -65,7 +65,7 @@ fi
   # export DUNE_CONFIG__DISPLAY=verbose
 ./configure --prefix="${OPAM_INSTALL_PREFIX}" --with-vendored-deps || { cat config.log; exit 1; }
 # sed -i '/(rule/,/(action.*opam-putenv/d' src/core/dune
-  sed -i '62,66d' src/core/dune
+  sed -i '62,67d' src/core/dune
 make
 make install
 
