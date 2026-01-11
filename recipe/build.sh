@@ -64,11 +64,6 @@ fi
   # export OCAMLPARAM='verbose=1,_'
   # export DUNE_CONFIG__DISPLAY=verbose
 ./configure --prefix="${OPAM_INSTALL_PREFIX}" --with-vendored-deps || { cat config.log; exit 1; }
-# sed -i '/(rule/,/(action.*opam-putenv/d' src/core/dune
-  # Remove the rule block (lines with enabled_if Win32 through action)
-  sed -i '/enabled_if.*Win32/,/opam-putenv\.c.*cc64/d' src/core/dune
-  # Remove the install stanza that references opam-putenv.exe
-  sed -i '/files.*opam-putenv\.exe/d' src/core/dune
   cat src/core/dune
 make
 make install
