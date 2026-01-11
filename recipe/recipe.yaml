@@ -1,0 +1,94 @@
+context:
+  name: ocaml
+  version: 2.5.0
+  library: ${{ "Library/" if not unix }}
+  m2: ${{ "m2-" if not unix }}
+
+package:
+  name: opam
+  version: ${{ version }}
+
+source:
+  - url: https://github.com/ocaml/opam/releases/download/${{ version }}/opam-full-${{ version }}.tar.gz
+    sha256: 25fb98f962c4227c1261e142afc68a416778e6e819600bd5ee3ec4a18ae1e238
+
+build:
+  number: 0
+
+requirements:
+  build:
+    - ${{ compiler('c') }}
+    - ${{ compiler('cxx') }}
+    - ${{ stdlib('c') }}
+    - ${{ m2 }}bash >=5.2
+    - ${{ m2 }}bzip2
+    - ${{ m2 }}findutils
+    - ${{ m2 }}gawk
+    - ${{ m2 }}grep
+    - ${{ m2 }}make
+    - ${{ m2 }}sed
+    - binutils
+    - curl
+    - git
+    - ocaml >=5.3.0 *_0
+    # - ocaml >=5.3.0
+    - pkg-config
+    - if: unix
+      then:
+        # OCaml compiler has zstd paths embedded from its build environment.
+        # We need zstd in build env so those paths resolve correctly.
+        - zstd
+      else:
+        - ${{ m2 }}coreutils
+        - ${{ m2 }}diffutils
+        - ${{ m2 }}which
+    - if: osx
+      then:
+        - lld
+        - llvm-tools
+
+    # We need to 2-phase as these do not exist yet for arm64 and non-unix
+    # We add opam bare for all archs, then later we update below
+    # - ocamlbuild
+    # - ocaml-findlib
+
+tests:
+  - package_contents:
+      bin:
+        - opam
+        - opam-installer
+      files:
+        - ${{ library }}share/man/man1/opam*
+
+  - script:
+      - opam --version | grep ${{ version }}
+    requirements:
+      run:
+        - ${{ m2 }}grep
+
+  # Test requires dune
+  # - script:
+  #     - dune runtest tests/reftests
+  #   files:
+  #     source:
+  #       - tests/reftests
+  #   requirements:
+  #     run:
+  #       - dune
+
+about:
+  homepage: https://github.com/ocaml/opam
+  license: LGPL-2.1-only
+  license_family: LGPL
+  license_file: LICENSE
+  summary: Objective Caml (OCaml) is an implementation of the ML language.
+  description: |
+    opam is a source-based package manager. It supports multiple simultaneous compiler
+    installations, flexible package constraints, and a Git-friendly development workflow.
+  repository: https://github.com/ocaml/opam
+
+extra:
+  recipe-maintainers:
+    - dslarm
+    - fasiha
+    - MementoRC
