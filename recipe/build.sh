@@ -63,10 +63,31 @@ if [[ "${target_platform}" == "osx-"* ]]; then
   export LIBRARY_PATH="${BUILD_LIB}:${HOST_LIB}${LIBRARY_PATH:+:$LIBRARY_PATH}"
   export LDFLAGS="-L${BUILD_LIB} -L${HOST_LIB} ${LDFLAGS:-}"
 
-  # Use system ar/ranlib on macOS - conda's ar may create incompatible archives
+  # Force system ar/ranlib on macOS - conda's ar creates incompatible archives
   # that cause linker errors with vendored OCaml dependencies
+  # We override PATH to ensure /usr/bin/ar is found first
   export AR=/usr/bin/ar
   export RANLIB=/usr/bin/ranlib
+  # Also create wrappers in BUILD_PREFIX to intercept calls
+  if [[ -f "${BUILD_PREFIX}/bin/ar" ]]; then
+    mv "${BUILD_PREFIX}/bin/ar" "${BUILD_PREFIX}/bin/ar.conda-backup" || true
+    ln -sf /usr/bin/ar "${BUILD_PREFIX}/bin/ar"
+  fi
+  if [[ -f "${BUILD_PREFIX}/bin/ranlib" ]]; then
+    mv "${BUILD_PREFIX}/bin/ranlib" "${BUILD_PREFIX}/bin/ranlib.conda-backup" || true
+    ln -sf /usr/bin/ranlib "${BUILD_PREFIX}/bin/ranlib"
+  fi
+  # Handle cross-compiler prefixed tools too
+  for prefix in x86_64-apple-darwin13.4.0 arm64-apple-darwin20.0.0; do
+    if [[ -f "${BUILD_PREFIX}/bin/${prefix}-ar" ]]; then
+      mv "${BUILD_PREFIX}/bin/${prefix}-ar" "${BUILD_PREFIX}/bin/${prefix}-ar.conda-backup" || true
+      ln -sf /usr/bin/ar "${BUILD_PREFIX}/bin/${prefix}-ar"
+    fi
+    if [[ -f "${BUILD_PREFIX}/bin/${prefix}-ranlib" ]]; then
+      mv "${BUILD_PREFIX}/bin/${prefix}-ranlib" "${BUILD_PREFIX}/bin/${prefix}-ranlib.conda-backup" || true
+      ln -sf /usr/bin/ranlib "${BUILD_PREFIX}/bin/${prefix}-ranlib"
+    fi
+  done
 
   # Fix rpath in OCaml binaries - they have @rpath pointing to placeholder build dir
   for binary in "${BUILD_PREFIX}/bin/ocaml" "${BUILD_PREFIX}/bin/ocamlc" "${BUILD_PREFIX}/bin/ocamlc.opt" "${BUILD_PREFIX}/bin/ocamlopt" "${BUILD_PREFIX}/bin/ocamlopt.opt"; do
