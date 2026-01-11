@@ -9,18 +9,22 @@ IFS=$'\n\t'
 # Override with OCAMLLIB to use actual BUILD_PREFIX path.
 if [[ "${target_platform}" == "linux-"* ]] || [[ "${target_platform}" == "osx-"* ]]; then
   export OCAMLLIB="${BUILD_PREFIX}/lib/ocaml"
+  export BUILD_INC="${BUILD_PREFIX}/include"
   export BUILD_LIB="${BUILD_PREFIX}/lib"
   export HOST_LIB="${PREFIX}/lib"
 else
   export OCAML_PREFIX="${_BUILD_PREFIX_}/Library"
   export OCAMLLIB="${_BUILD_PREFIX_}/Library/lib/ocaml"
+  export BUILD_INC="${_BUILD_PREFIX_}/Library/include"
   export BUILD_LIB="${_BUILD_PREFIX_}/Library/lib"
   export HOST_LIB="${_PREFIX_}/Library/lib"
 fi
 
 # Patch 5.3.0 ( |L|,)<bad path to>lib (covers lib(/|\)ocaml
-sed -i -E "s#^/[^ ]*_env[^ ]*lib#${BUILD_LIB}#g" "${OCAMLLIB}/ld.conf"
+# sed -i -E "s#^/[^ ]*_env[^ ]*lib#${BUILD_LIB}#g" "${OCAMLLIB}/ld.conf"
+sed -i -E "s#( )[^ ,]*_env[^ ]*inc#\1${BUILD_INC}#g" "${OCAMLLIB}/Makefile.config"
 sed -i -E "s#(-L| |,)[^ ,]*_env[^ ]*lib#\1${BUILD_LIB}#g" "${OCAMLLIB}/Makefile.config"
+sed -i -E "s#(=\s*)[^ ]*_env[^ ]*lib#\1${BUILD_PREFIX}#g" "${OCAMLLIB}/Makefile.config"
 cat "${OCAMLLIB}/ld.conf"
 cat "${OCAMLLIB}/Makefile.config"
 
