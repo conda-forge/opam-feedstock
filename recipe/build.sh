@@ -27,8 +27,19 @@ sed -i -E "s#(-L| |,)[^ ,]*_env[^ ]*lib#\1${BUILD_LIB}#g" "${OCAMLLIB}/Makefile.
 sed -i -E "s#-fdebug-prefix-map=[^ ]*_env[^ ]*##g" "${OCAMLLIB}/Makefile.config"
 sed -i -E "s#-fdebug-prefix-map=[^ ]*_ocaml[^ ]*##g" "${OCAMLLIB}/Makefile.config"
 sed -i -E "s#(=\s*)[^ ]*_env[^ ]*#\1${BUILD_PREFIX}#g" "${OCAMLLIB}/Makefile.config"
+echo "=== OCaml config files ==="
+echo "--- ld.conf ---"
 cat "${OCAMLLIB}/ld.conf"
-cat "${OCAMLLIB}/Makefile.config"
+echo ""
+echo "--- Searching for placeholder paths in Makefile.config ---"
+grep -n "placehold\|_env" "${OCAMLLIB}/Makefile.config" || echo "No placeholder paths found in Makefile.config"
+echo ""
+echo "--- Key LDFLAGS lines ---"
+grep -n "LDFLAGS\|LIBS\|LINKFLAGS\|NATIVECCLIBS\|BYTECCLIBS" "${OCAMLLIB}/Makefile.config" || true
+echo ""
+echo "--- Searching all files in OCAMLLIB for placeholders ---"
+grep -r "placehold" "${OCAMLLIB}/" 2>/dev/null | head -20 || echo "No placeholder found"
+echo "=== end OCaml config ==="
 
 # ==============================================================================
 # OPAM Build Script
@@ -48,33 +59,12 @@ fi
 # that weren't properly relocated. We need to ensure the linker can find zstd.
 if [[ "${target_platform}" == "osx-"* ]]; then
   # Ensure dynamic linker can find zstd at runtime
-  # Fix bug: was referencing LIBRARY_PATH instead of DYLD_LIBRARY_PATH
-  export DYLD_LIBRARY_PATH="${BUILD_LIB}:${HOST_LIB}${DYLD_LIBRARY_PATH:+:$DYLD_LIBRARY_PATH}"
   export DYLD_FALLBACK_LIBRARY_PATH="${BUILD_LIB}:${HOST_LIB}${DYLD_FALLBACK_LIBRARY_PATH:+:$DYLD_FALLBACK_LIBRARY_PATH}"
   export LIBRARY_PATH="${BUILD_LIB}:${HOST_LIB}${LIBRARY_PATH:+:$LIBRARY_PATH}"
   export LDFLAGS="-L${BUILD_LIB} -L${HOST_LIB} ${LDFLAGS:-}"
 
-  export AR=$(find \
-                  "${BUILD_PREFIX}"/bin \
-                  "${PREFIX}"/bin \
-                  \( -name "llvm-ar" \) \
-                  \( -type f -o -type l \) \
-                  -perm /111 \
-                  2>/dev/null | head -1)
-  export RANLIB=$(find \
-                  "${BUILD_PREFIX}"/bin \
-                  "${PREFIX}"/bin \
-                  \( -name "llvm-ranlib" \) \
-                  \( -type f -o -type l \) \
-                  -perm /111 \
-                  2>/dev/null | head -1)
-  export LD=$(find \
-                  "${BUILD_PREFIX}"/bin \
-                  "${PREFIX}"/bin \
-                  \( -name "lld" \) \
-                  \( -type f -o -type l \) \
-                  -perm /111 \
-                  2>/dev/null | head -1)
+  # DO NOT use llvm-ar/llvm-ranlib/lld - they create incompatible archives for macOS
+  # Use the default clang/system toolchain instead
 
   # Fix rpath in OCaml binaries - they have @rpath pointing to placeholder build dir
   for binary in "${BUILD_PREFIX}/bin/ocaml" "${BUILD_PREFIX}/bin/ocamlc" "${BUILD_PREFIX}/bin/ocamlc.opt" "${BUILD_PREFIX}/bin/ocamlopt" "${BUILD_PREFIX}/bin/ocamlopt.opt"; do
@@ -82,6 +72,13 @@ if [[ "${target_platform}" == "osx-"* ]]; then
       install_name_tool -add_rpath "${BUILD_LIB}" "$binary" 2>/dev/null || true
     fi
   done
+
+  echo "=== macOS toolchain info ==="
+  echo "AR: $(which ar)"
+  echo "RANLIB: $(which ranlib)"
+  echo "LD: $(which ld)"
+  echo "CC: ${CC:-$(which cc)}"
+  echo "=== end toolchain info ==="
 fi
 
 ./configure --prefix="${OPAM_INSTALL_PREFIX}" --with-vendored-deps || { cat config.log; exit 1; }
