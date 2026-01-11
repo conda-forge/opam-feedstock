@@ -19,7 +19,7 @@ else
 fi
 
 # Patch 5.3.0 ( |L|,)<bad path to>lib (covers lib(/|\)ocaml
-sed -i -E "s#^/[^ ]*_env[^ ]*lib#\1${BUILD_LIB}#g" "${OCAMLLIB}/ld.conf"
+sed -i -E "s#^/[^ ]*_env[^ ]*lib#${BUILD_LIB}#g" "${OCAMLLIB}/ld.conf"
 sed -i -E "s#(-L| |,)[^ ,]*_env[^ ]*lib#\1${BUILD_LIB}#g" "${OCAMLLIB}/Makefile.config"
 cat "${OCAMLLIB}/ld.conf"
 cat "${OCAMLLIB}/Makefile.config"
