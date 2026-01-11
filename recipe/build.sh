@@ -19,7 +19,6 @@ else
 fi
 # ( |L|,)<bad path to>lib (covers lib(/|\)ocaml
 sed -i -E "s#(-L| |,)[^ ,]*_env[^ ]*lib#\1${BUILD_LIB}#g" "${OCAMLLIB}/ld.conf" "${OCAMLLIB}/Makefile.config"
-echo "OCAMLLIB=${OCAMLLIB}"
 
 # ==============================================================================
 # OPAM Build Script
@@ -29,20 +28,11 @@ if [[ "${target_platform}" == "linux-"* ]] || [[ "${target_platform}" == "osx-"*
   export OPAM_INSTALL_PREFIX="${PREFIX}"
 else
   export OPAM_INSTALL_PREFIX="${_PREFIX_}/Library"
-  
   BZIP2=$(find ${_BUILD_PREFIX_} ${_PREFIX_} \( -name bzip2 -o -name bzip2.exe \) \( -type f -o -type l \) -perm /111 | head -1)
-#   if [[ ! -f $(dirname ${BZIP2})/bunzip2 ]]; then
-#     cat > $(dirname ${BZIP2})/bunzip2 << 'EOF'
-# @echo off
-# ${BZIP2} -d %*
-# EOF
-#   fi
-  
   export BUNZIP2="${BZIP2} -d"
   # export CC64="x86_64-w64-mingw32-gcc -m32"
   export CC64=false
 fi
-echo "OCAMLLIB=${OCAMLLIB}"
 
 # OCaml has hardcoded zstd library paths from its build environment that may not exist.
 # The OCaml compiler stores library paths in its config that include placeholder paths
@@ -53,18 +43,15 @@ if [[ "${target_platform}" == "osx-"* ]]; then
   export LDFLAGS="-L${BUILD_LIB} -L${HOST_LIB} ${LDFLAGS:-}"
 fi
 
-  echo "=== OCaml Makefile.config ZSTD/BYTECCLIBS ==="
-  grep -E "ZSTD|BYTECCLIBS" "${OCAMLLIB}/Makefile.config"
-  echo "=== Check for any @ in Makefile.config ==="
-  grep "@" "${OCAMLLIB}/Makefile.config" || echo "No @ found"
-  echo "=== Full LDFLAGS line ==="
-  grep "^LDFLAGS" "${OCAMLLIB}/Makefile.config" || echo "No LDFLAGS found"
-  echo "=== end debug ==="
-  ls -la "${OCAMLLIB}/Makefile.config"
-  # export OCAMLPARAM='verbose=1,_'
-  # export DUNE_CONFIG__DISPLAY=verbose
 ./configure --prefix="${OPAM_INSTALL_PREFIX}" --with-vendored-deps || { cat config.log; exit 1; }
+if [[ "${target_platform}" != "linux-"* ]] && [[ "${target_platform}" != "osx-"* ]]; then
+  echo "=== dune debug ==="
   cat src/core/dune
+    sed -i '/enabled_if.*Win32/,/opam-putenv\.c.*cc64/{d;}' src/core/dune
+    sed -i '/install/,/opam-putenv\.exe/{/opam-putenv\.exe/d;}' src/core/dune
+  cat src/core/dune
+  echo "=== end debug ==="
+fi
 make
 make install
 
