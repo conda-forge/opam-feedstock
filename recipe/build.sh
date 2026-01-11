@@ -30,7 +30,7 @@ sed -i -E "s#-fdebug-prefix-map=[^ ]*_ocaml[^ ]*##g" "${OCAMLLIB}/Makefile.confi
 sed -i -E "s#(=\s*)[^ ]*_env[^ ]*#\1${BUILD_PREFIX}#g" "${OCAMLLIB}/Makefile.config"
 
 # Also fix ld.conf which lists library search paths
-sed -i -E "s#^/[^ ]*_env[^ ]*lib.*#${BUILD_LIB}#g" "${OCAMLLIB}/ld.conf"
+sed -i -E "s#^/[^ ]*_env[^ ]*lib#${BUILD_LIB}#g" "${OCAMLLIB}/ld.conf"
 
 echo "=== OCaml config after patching ==="
 cat "${OCAMLLIB}/ld.conf"
@@ -63,6 +63,8 @@ if [[ "${target_platform}" == "osx-"* ]]; then
   echo "=== macOS library paths ==="
   echo "DYLD_FALLBACK_LIBRARY_PATH: ${DYLD_FALLBACK_LIBRARY_PATH}"
   echo "BUILD_LIB: ${BUILD_LIB}"
+  
+  env
   
   export AR=$(find \
                   "${BUILD_PREFIX}"/bin \
