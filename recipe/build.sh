@@ -30,9 +30,6 @@ if [[ "${target_platform}" == "linux-"* ]] || [[ "${target_platform}" == "osx-"*
 else
   export OPAM_INSTALL_PREFIX="${_PREFIX_}/Library"
   
-  echo "x86_64-w64-mingw32-gcc -m32" > "${BUILD_PREFIX}/Library/bin/i686-w64-mingw32-gcc"
-  chmod +x "${BUILD_PREFIX}/Library/bin/i686-w64-mingw32-gcc"
-  
   BZIP2=$(find ${_BUILD_PREFIX_} ${_PREFIX_} \( -name bzip2 -o -name bzip2.exe \) \( -type f -o -type l \) -perm /111 | head -1)
 #   if [[ ! -f $(dirname ${BZIP2})/bunzip2 ]]; then
 #     cat > $(dirname ${BZIP2})/bunzip2 << 'EOF'
@@ -42,7 +39,7 @@ else
 #   fi
   
   export BUNZIP2="${BZIP2} -d"
-  export CC64="${BUILD_PREFIX}/Library/bin/i686-w64-mingw32-gcc"
+  export CC64="x86_64-w64-mingw32-gcc -m32"
 fi
 echo "OCAMLLIB=${OCAMLLIB}"
 
