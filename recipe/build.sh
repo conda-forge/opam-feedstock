@@ -47,8 +47,9 @@ fi
 if [[ "${target_platform}" != "linux-"* ]] && [[ "${target_platform}" != "osx-"* ]]; then
   echo "=== dune debug ==="
   cat src/core/dune
-    sed -i '/enabled_if.*Win32/,/opam-putenv\.c.*cc64/{d;}' src/core/dune
-    sed -i '/install/,/opam-putenv\.exe/{/opam-putenv\.exe/d;}' src/core/dune
+    sed -i '/^(rule$/,/cc64)))/d' src/core/dune
+    sed -i '/^(install$/,/opam-putenv\.exe))/d' src/core/dune
+  echo "=== Post-Replace ==="
   cat src/core/dune
   echo "=== end debug ==="
 fi
