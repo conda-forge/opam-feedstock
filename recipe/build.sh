@@ -24,8 +24,9 @@ fi
 # sed -i -E "s#^/[^ ]*_env[^ ]*lib#${BUILD_LIB}#g" "${OCAMLLIB}/ld.conf"
 sed -i -E "s#( )[^ ,]*_env[^ ]*inc#\1${BUILD_INC}#g" "${OCAMLLIB}/Makefile.config"
 sed -i -E "s#(-L| |,)[^ ,]*_env[^ ]*lib#\1${BUILD_LIB}#g" "${OCAMLLIB}/Makefile.config"
-sed -i -E "s#(=\s*)[^ ]*_env[^ ]*#\1${BUILD_PREFIX}#g" "${OCAMLLIB}/Makefile.config"
 sed -i -E "s#-fdebug-prefix-map=[^ ]*_env[^ ]*##g" "${OCAMLLIB}/Makefile.config"
+sed -i -E "s#-fdebug-prefix-map=[^ ]*_ocaml[^ ]*##g" "${OCAMLLIB}/Makefile.config"
+sed -i -E "s#(=\s*)[^ ]*_env[^ ]*#\1${BUILD_PREFIX}#g" "${OCAMLLIB}/Makefile.config"
 cat "${OCAMLLIB}/ld.conf"
 cat "${OCAMLLIB}/Makefile.config"
 
@@ -47,6 +48,7 @@ fi
 # that weren't properly relocated. We need to ensure the linker can find zstd.
 if [[ "${target_platform}" == "osx-"* ]]; then
   # Ensure linker can find zstd via environment - check both build and host prefixes
+  export DYLD_LIBRARY_PATH="${BUILD_LIB}:${HOST_LIB}${LIBRARY_PATH:+:$LIBRARY_PATH}"
   export LIBRARY_PATH="${BUILD_LIB}:${HOST_LIB}${LIBRARY_PATH:+:$LIBRARY_PATH}"
   export LDFLAGS="-L${BUILD_LIB} -L${HOST_LIB} ${LDFLAGS:-}"
 fi
