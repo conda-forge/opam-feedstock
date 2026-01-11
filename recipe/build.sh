@@ -61,19 +61,19 @@ if [[ "${target_platform}" != "linux-"* ]] && [[ "${target_platform}" != "osx-"*
   echo "architecture:" $(dune eval '%{architecture}' 2>&1 || echo "eval failed")
   echo "=== end dune diagnostic ==="
 
-  # Windows: Pre-create generated .ml files that dune has trouble with
-  # Dune on Windows doesn't properly recognize conditional rules during analysis
-  # These will be overwritten by dune rules during actual build
-  echo '(* placeholder - overwritten by dune *)' > src/core/opamCoreConfigDeveloper.ml
-  echo '(* placeholder - overwritten by dune *)' > src/core/opamVersionInfo.ml
+  # Windows: Pre-create generated files that dune has trouble with
+  # These must be valid OCaml matching the .mli interfaces
+  echo 'let value = ""' > src/core/opamCoreConfigDeveloper.ml
+  echo 'let version = "2.5.0"' > src/core/opamVersionInfo.ml
   cp src/core/opamStubs.ocaml5.ml src/core/opamStubs.ml
   cp src/core/opamWin32Stubs.win32.ml src/core/opamWin32Stubs.ml
 
+  # Create c-libraries.sexp (lists C libraries to link)
+  echo '()' > src/core/c-libraries.sexp
+
   # Create self-contained opam_stubs.c by inlining the #included C files
-  # opamCommonStubs.c uses #include to pull in opamInject.c and opamWindows.c
-  # When dune copies to _build/, those files aren't there, so we inline them
   pushd src/core
-  head -n 73 opamCommonStubs.c > opam_stubs.c  # Everything up to /* This is done here... */ comment
+  head -n 73 opamCommonStubs.c > opam_stubs.c
   echo "/* Inlined for Windows build - opamInject.c */" >> opam_stubs.c
   cat opamInject.c >> opam_stubs.c
   echo "/* Inlined for Windows build - opamWindows.c */" >> opam_stubs.c
