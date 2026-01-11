@@ -17,8 +17,12 @@ else
   export BUILD_LIB="${_BUILD_PREFIX_}/Library/lib"
   export HOST_LIB="${_PREFIX_}/Library/lib"
 fi
-# ( |L|,)<bad path to>lib (covers lib(/|\)ocaml
-sed -i -E "s#(-L| |,)[^ ,]*_env[^ ]*lib#\1${BUILD_LIB}#g" "${OCAMLLIB}/ld.conf" "${OCAMLLIB}/Makefile.config"
+
+# Patch 5.3.0 ( |L|,)<bad path to>lib (covers lib(/|\)ocaml
+sed -i -E "s#^/[^ ]*_env[^ ]*lib#\1${BUILD_LIB}#g" "${OCAMLLIB}/ld.conf"
+sed -i -E "s#(-L| |,)[^ ,]*_env[^ ]*lib#\1${BUILD_LIB}#g" "${OCAMLLIB}/Makefile.config"
+cat "${OCAMLLIB}/ld.conf"
+cat "${OCAMLLIB}/Makefile.config"
 
 # ==============================================================================
 # OPAM Build Script
@@ -30,7 +34,6 @@ else
   export OPAM_INSTALL_PREFIX="${_PREFIX_}/Library"
   BZIP2=$(find ${_BUILD_PREFIX_} ${_PREFIX_} \( -name bzip2 -o -name bzip2.exe \) \( -type f -o -type l \) -perm /111 | head -1)
   export BUNZIP2="${BZIP2} -d"
-  # export CC64="x86_64-w64-mingw32-gcc -m32"
   export CC64=false
 fi
 
@@ -47,8 +50,8 @@ fi
 if [[ "${target_platform}" != "linux-"* ]] && [[ "${target_platform}" != "osx-"* ]]; then
   echo "=== dune debug ==="
   cat src/core/dune
-    sed -i '/^(rule$/,/cc64)))/d' src/core/dune
-    sed -i '/^(install$/,/opam-putenv\.exe))/d' src/core/dune
+  sed -i '/^(rule$/,/cc64)))/d' src/core/dune
+  sed -i '/^(install$/,/opam-putenv\.exe))/d' src/core/dune
   echo "=== Post-Replace ==="
   cat src/core/dune
   echo "=== end debug ==="

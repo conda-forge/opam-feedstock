@@ -1,5 +1,3 @@
-bzip2:
-- '1'
 c_compiler:
 - gcc
 c_compiler_version:
@@ -20,5 +18,3 @@ cxx_compiler_version:
 - '15'
 target_platform:
 - win-64
-zstd:
-- '1.5'
