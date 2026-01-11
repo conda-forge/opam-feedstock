@@ -3,25 +3,6 @@ set -euo pipefail
 IFS=$'\n\t'
 
 # ==============================================================================
-# Environment Setup
-# ==============================================================================
-
-# Set up path variables for OCaml and libraries
-if [[ "${target_platform}" == "linux-"* ]] || [[ "${target_platform}" == "osx-"* ]]; then
-  export OCAMLLIB="${BUILD_PREFIX}/lib/ocaml"
-  export BUILD_INC="${BUILD_PREFIX}/include"
-  export BUILD_LIB="${BUILD_PREFIX}/lib"
-  export HOST_LIB="${PREFIX}/lib"
-else
-  # Windows paths use Library subdirectory
-  export OCAML_PREFIX="${_BUILD_PREFIX_}/Library"
-  export OCAMLLIB="${_BUILD_PREFIX_}/Library/lib/ocaml"
-  export BUILD_INC="${_BUILD_PREFIX_}/Library/include"
-  export BUILD_LIB="${_BUILD_PREFIX_}/Library/lib"
-  export HOST_LIB="${_PREFIX_}/Library/lib"
-fi
-
-# ==============================================================================
 # OPAM Build
 # ==============================================================================
 
@@ -48,8 +29,8 @@ if [[ "${target_platform}" != "linux-"* ]] && [[ "${target_platform}" != "osx-"*
   sed -i '/^(install$/,/opam-putenv\.exe))/d' src/core/dune
 
   # Pre-create generated .ml files that dune has trouble with
-  echo 'let value = ""' > src/core/opamCoreConfigDeveloper.ml
-  echo 'let version = "2.5.0"' > src/core/opamVersionInfo.ml
+  echo "let value = \"\"" > src/core/opamCoreConfigDeveloper.ml
+  echo "let version = \"${PKG_VERSION}\"" > src/core/opamVersionInfo.ml
   cp src/core/opamStubs.ocaml5.ml src/core/opamStubs.ml
   cp src/core/opamWin32Stubs.win32.ml src/core/opamWin32Stubs.ml
 
@@ -62,6 +43,8 @@ if [[ "${target_platform}" != "linux-"* ]] && [[ "${target_platform}" != "osx-"*
   cat opamInject.c >> opam_stubs.c
   cat opamWindows.c >> opam_stubs.c
   popd > /dev/null
+  
+  export PATH="${_BUILD_PREFIX_}\\Library\\bin;${PATH}"
 fi
 
 make
