@@ -53,14 +53,24 @@ if [[ "${target_platform}" != "linux-"* ]] && [[ "${target_platform}" != "osx-"*
   cat src/core/dune
   echo "=== end debug ==="
 
-  # Windows: Pre-create generated files that dune has trouble with
-  # Dune on Windows doesn't properly recognize conditional rules and copy# actions
+  # Windows: Pre-create generated .ml files that dune has trouble with
+  # Dune on Windows doesn't properly recognize conditional rules during analysis
   # These will be overwritten by dune rules during actual build
   echo '(* placeholder - overwritten by dune *)' > src/core/opamCoreConfigDeveloper.ml
   echo '(* placeholder - overwritten by dune *)' > src/core/opamVersionInfo.ml
   cp src/core/opamStubs.ocaml5.ml src/core/opamStubs.ml
   cp src/core/opamWin32Stubs.win32.ml src/core/opamWin32Stubs.ml
-  cp src/core/opamCommonStubs.c src/core/opam_stubs.c
+
+  # Create self-contained opam_stubs.c by inlining the #included C files
+  # opamCommonStubs.c uses #include to pull in opamInject.c and opamWindows.c
+  # When dune copies to _build/, those files aren't there, so we inline them
+  pushd src/core
+  head -n 73 opamCommonStubs.c > opam_stubs.c  # Everything up to /* This is done here... */ comment
+  echo "/* Inlined for Windows build - opamInject.c */" >> opam_stubs.c
+  cat opamInject.c >> opam_stubs.c
+  echo "/* Inlined for Windows build - opamWindows.c */" >> opam_stubs.c
+  cat opamWindows.c >> opam_stubs.c
+  popd
 fi
 make
 make install
