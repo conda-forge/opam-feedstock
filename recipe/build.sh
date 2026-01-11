@@ -53,6 +53,14 @@ if [[ "${target_platform}" != "linux-"* ]] && [[ "${target_platform}" != "osx-"*
   cat src/core/dune
   echo "=== end debug ==="
 
+  # Diagnostic: Check what dune thinks the os_type is
+  echo "=== dune os_type diagnostic ==="
+  echo "os_type:" $(dune eval '%{os_type}' 2>&1 || echo "eval failed")
+  echo "ocaml_version:" $(dune eval '%{ocaml_version}' 2>&1 || echo "eval failed")
+  echo "system:" $(dune eval '%{system}' 2>&1 || echo "eval failed")
+  echo "architecture:" $(dune eval '%{architecture}' 2>&1 || echo "eval failed")
+  echo "=== end dune diagnostic ==="
+
   # Windows: Pre-create generated .ml files that dune has trouble with
   # Dune on Windows doesn't properly recognize conditional rules during analysis
   # These will be overwritten by dune rules during actual build
