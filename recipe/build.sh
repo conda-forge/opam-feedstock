@@ -52,6 +52,13 @@ if [[ "${target_platform}" != "linux-"* ]] && [[ "${target_platform}" != "osx-"*
   echo "=== Post-Replace ==="
   cat src/core/dune
   echo "=== end debug ==="
+
+  # Windows: Create placeholder .ml files that dune rules will overwrite
+  # Dune on Windows has trouble seeing that conditional rules will generate these
+  # The actual content comes from dune rules during build
+  echo '(* placeholder - overwritten by dune *)' > src/core/opamCoreConfigDeveloper.ml
+  echo '(* placeholder - overwritten by dune *)' > src/core/opamVersionInfo.ml
+  cp src/core/opamStubs.ocaml5.ml src/core/opamStubs.ml
 fi
 make
 make install
