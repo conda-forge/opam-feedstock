@@ -63,8 +63,10 @@ if [[ "${target_platform}" == "osx-"* ]]; then
   export LIBRARY_PATH="${BUILD_LIB}:${HOST_LIB}${LIBRARY_PATH:+:$LIBRARY_PATH}"
   export LDFLAGS="-L${BUILD_LIB} -L${HOST_LIB} ${LDFLAGS:-}"
 
-  # DO NOT use llvm-ar/llvm-ranlib/lld - they create incompatible archives for macOS
-  # Use the default clang/system toolchain instead
+  # Use system ar/ranlib on macOS - conda's ar may create incompatible archives
+  # that cause linker errors with vendored OCaml dependencies
+  export AR=/usr/bin/ar
+  export RANLIB=/usr/bin/ranlib
 
   # Fix rpath in OCaml binaries - they have @rpath pointing to placeholder build dir
   for binary in "${BUILD_PREFIX}/bin/ocaml" "${BUILD_PREFIX}/bin/ocamlc" "${BUILD_PREFIX}/bin/ocamlc.opt" "${BUILD_PREFIX}/bin/ocamlopt" "${BUILD_PREFIX}/bin/ocamlopt.opt"; do
