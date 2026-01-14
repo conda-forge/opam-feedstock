@@ -91,18 +91,16 @@ if [[ "${target_platform}" != "linux-"* ]] && [[ "${target_platform}" != "osx-"*
   export RANLIB=x86_64-w64-mingw32-ranlib
 
   # Create dune-workspace to specify C compiler with full path
-  # Use unquoted EOF to allow variable expansion
-  gcc_path="${BUILD_PREFIX}/Library/mingw-w64/bin/x86_64-w64-mingw32-gcc.exe"
-  gxx_path="${BUILD_PREFIX}/Library/mingw-w64/bin/x86_64-w64-mingw32-g++.exe"
+  # Debug: show what BUILD_PREFIX actually contains
+  echo "DEBUG: BUILD_PREFIX=${BUILD_PREFIX}"
+  echo "DEBUG: Full gcc path: ${BUILD_PREFIX}/Library/mingw-w64/bin/x86_64-w64-mingw32-gcc.exe"
 
-  cat > dune-workspace <<EOF
-(lang dune 3.0)
-(context
- (default
-  (toolchain
-   (c "${gcc_path}")
-   (cxx "${gxx_path}"))))
-EOF
+  # Use printf to substitute variable and escape quotes properly
+  printf '(lang dune 3.0)\n(context\n (default\n  (toolchain\n   (c "%s/Library/mingw-w64/bin/x86_64-w64-mingw32-gcc.exe")\n   (cxx "%s/Library/mingw-w64/bin/x86_64-w64-mingw32-g++.exe"))))\n' "${BUILD_PREFIX}" "${BUILD_PREFIX}" > dune-workspace
+
+  # Debug: show what was written
+  echo "DEBUG: dune-workspace content:"
+  cat dune-workspace
 fi
 
 make
