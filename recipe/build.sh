@@ -82,7 +82,7 @@ if [[ "${target_platform}" != "linux-"* ]] && [[ "${target_platform}" != "osx-"*
   popd > /dev/null
 
   # Add mingw-w64 bin directory to PATH for gcc discovery
-  export PATH="${_BUILD_PREFIX_}\\Library\\mingw-w64\\bin;${_BUILD_PREFIX_}\\Library\\bin;${PATH}"
+  export PATH="$BUILD_PREFIX/Library/mingw-w64/bin:$BUILD_PREFIX/Library/bin:$PATH"
 
   # Set CC/CXX for Dune's compiler discovery
   export CC=x86_64-w64-mingw32-gcc
@@ -93,8 +93,3 @@ fi
 
 make
 make install
-
-# DEBUG: Exit early for cross-compilation to preserve build artifacts
-if [[ "${target_platform}" != "${build_platform:-${target_platform}}" ]]; then
-  exit 1
-fi
