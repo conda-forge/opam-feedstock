@@ -84,16 +84,16 @@ if [[ "${target_platform}" != "linux-"* ]] && [[ "${target_platform}" != "osx-"*
   # Add mingw-w64 bin directory to PATH for gcc discovery
   export PATH="$BUILD_PREFIX/Library/mingw-w64/bin:$BUILD_PREFIX/Library/bin:$PATH"
 
-  # Set CC/CXX for Dune's compiler discovery
-  export CC=x86_64-w64-mingw32-gcc
-  export CXX=x86_64-w64-mingw32-g++
-  export AR=x86_64-w64-mingw32-ar
-  export RANLIB=x86_64-w64-mingw32-ranlib
+  # Set CC/CXX with full paths for Dune to find gcc
+  # Dune uses CC/CXX environment variables for C compiler discovery
+  export CC="$(which x86_64-w64-mingw32-gcc)"
+  export CC="${_PREFIX}/Library/bin/x86_64-w64-mingw32-gcc.exe"
+  export CXX="$(which x86_64-w64-mingw32-g++)"
+  export AR="$(which x86_64-w64-mingw32-ar)"
+  export RANLIB="$(which x86_64-w64-mingw32-ranlib)"
 
-  # Create dune-workspace to specify C compiler with full path
-  # Use _BUILD_PREFIX_ (rattler-build internal variable) instead of BUILD_PREFIX
-  # BUILD_PREFIX is set to %BUILD_PREFIX% on Windows for display purposes
-  printf '(lang dune 3.0)\n(context\n (default\n  (toolchain\n   (c "%s/Library/mingw-w64/bin/x86_64-w64-mingw32-gcc.exe")\n   (cxx "%s/Library/mingw-w64/bin/x86_64-w64-mingw32-g++.exe"))))\n' "${_BUILD_PREFIX_}" "${_BUILD_PREFIX_}" > dune-workspace
+  echo "DEBUG: CC=${CC}"
+  echo "DEBUG: CXX=${CXX}"
 fi
 
 make
