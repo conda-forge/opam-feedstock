@@ -81,18 +81,14 @@ if [[ "${target_platform}" != "linux-"* ]] && [[ "${target_platform}" != "osx-"*
   cat opamWindows.c >> opam_stubs.c
   popd > /dev/null
 
-  export PATH="${_BUILD_PREFIX_}\\Library\\bin;${PATH}"
+  # Add mingw-w64 bin directory to PATH for gcc discovery
+  export PATH="${_BUILD_PREFIX_}\\Library\\mingw-w64\\bin;${_BUILD_PREFIX_}\\Library\\bin;${PATH}"
 
-  # DEBUG: Find where gcc executables actually are
-  echo "=== DEBUG: Searching for x86_64-w64-mingw32-gcc.exe ==="
-  find "${_BUILD_PREFIX_}" "${_PREFIX_}" -name "x86_64-w64-mingw32-gcc.exe" -type f 2>/dev/null || echo "NOT FOUND in BUILD_PREFIX or PREFIX"
-  find "${_BUILD_PREFIX_}" "${_PREFIX_}" -name "*gcc*.exe" -type f 2>/dev/null | head -10
-  echo "=== DEBUG: Current PATH ==="
-  echo "${PATH}" | tr ';' '\n'
-  echo "=== DEBUG: which gcc ==="
-  which gcc.exe || echo "gcc.exe not in PATH"
-  which x86_64-w64-mingw32-gcc.exe || echo "x86_64-w64-mingw32-gcc.exe not in PATH"
-  echo "==========================="
+  # Set CC/CXX for Dune's compiler discovery
+  export CC=x86_64-w64-mingw32-gcc
+  export CXX=x86_64-w64-mingw32-g++
+  export AR=x86_64-w64-mingw32-ar
+  export RANLIB=x86_64-w64-mingw32-ranlib
 fi
 
 make
