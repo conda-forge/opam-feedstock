@@ -91,13 +91,17 @@ if [[ "${target_platform}" != "linux-"* ]] && [[ "${target_platform}" != "osx-"*
   export RANLIB=x86_64-w64-mingw32-ranlib
 
   # Create dune-workspace to specify C compiler with full path
+  # Use unquoted EOF to allow variable expansion
+  gcc_path="${BUILD_PREFIX}/Library/mingw-w64/bin/x86_64-w64-mingw32-gcc.exe"
+  gxx_path="${BUILD_PREFIX}/Library/mingw-w64/bin/x86_64-w64-mingw32-g++.exe"
+
   cat > dune-workspace <<EOF
 (lang dune 3.0)
 (context
  (default
   (toolchain
-   (c "${BUILD_PREFIX}/Library/mingw-w64/bin/x86_64-w64-mingw32-gcc.exe")
-   (cxx "${BUILD_PREFIX}/Library/mingw-w64/bin/x86_64-w64-mingw32-g++.exe"))))
+   (c "${gcc_path}")
+   (cxx "${gxx_path}"))))
 EOF
 fi
 
