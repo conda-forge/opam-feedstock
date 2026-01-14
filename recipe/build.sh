@@ -91,16 +91,9 @@ if [[ "${target_platform}" != "linux-"* ]] && [[ "${target_platform}" != "osx-"*
   export RANLIB=x86_64-w64-mingw32-ranlib
 
   # Create dune-workspace to specify C compiler with full path
-  # Debug: show what BUILD_PREFIX actually contains
-  echo "DEBUG: BUILD_PREFIX=${BUILD_PREFIX}"
-  echo "DEBUG: Full gcc path: ${BUILD_PREFIX}/Library/mingw-w64/bin/x86_64-w64-mingw32-gcc.exe"
-
-  # Use printf to substitute variable and escape quotes properly
-  printf '(lang dune 3.0)\n(context\n (default\n  (toolchain\n   (c "%s/Library/mingw-w64/bin/x86_64-w64-mingw32-gcc.exe")\n   (cxx "%s/Library/mingw-w64/bin/x86_64-w64-mingw32-g++.exe"))))\n' "${BUILD_PREFIX}" "${BUILD_PREFIX}" > dune-workspace
-
-  # Debug: show what was written
-  echo "DEBUG: dune-workspace content:"
-  cat dune-workspace
+  # Use _BUILD_PREFIX_ (rattler-build internal variable) instead of BUILD_PREFIX
+  # BUILD_PREFIX is set to %BUILD_PREFIX% on Windows for display purposes
+  printf '(lang dune 3.0)\n(context\n (default\n  (toolchain\n   (c "%s/Library/mingw-w64/bin/x86_64-w64-mingw32-gcc.exe")\n   (cxx "%s/Library/mingw-w64/bin/x86_64-w64-mingw32-g++.exe"))))\n' "${_BUILD_PREFIX_}" "${_BUILD_PREFIX_}" > dune-workspace
 fi
 
 make
