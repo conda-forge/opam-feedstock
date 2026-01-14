@@ -86,4 +86,8 @@ fi
 
 make
 make install
-exit 1  # DEBUG: preserve build artifacts for inspection
+
+# DEBUG: Exit early for cross-compilation to preserve build artifacts
+if [[ "${target_platform}" != "${build_platform:-${target_platform}}" ]]; then
+  exit 1
+fi
