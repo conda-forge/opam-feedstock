@@ -30,7 +30,7 @@ requirements:
     - binutils
     - curl
     - git
-    - ocaml >=5.3.0 *_3
+    - ocaml >=5.3.0 *_2
     - if: unix
       then:
         # OCaml compiler has zstd paths embedded from its build environment.
