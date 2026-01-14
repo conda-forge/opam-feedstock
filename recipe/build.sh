@@ -89,6 +89,16 @@ if [[ "${target_platform}" != "linux-"* ]] && [[ "${target_platform}" != "osx-"*
   export CXX=x86_64-w64-mingw32-g++
   export AR=x86_64-w64-mingw32-ar
   export RANLIB=x86_64-w64-mingw32-ranlib
+
+  # Create dune-workspace to specify C compiler with full path
+  cat > dune-workspace <<EOF
+(lang dune 3.0)
+(context
+ (default
+  (toolchain
+   (c (exe ${BUILD_PREFIX}/Library/mingw-w64/bin/x86_64-w64-mingw32-gcc.exe))
+   (cxx (exe ${BUILD_PREFIX}/Library/mingw-w64/bin/x86_64-w64-mingw32-g++.exe)))))
+EOF
 fi
 
 make
