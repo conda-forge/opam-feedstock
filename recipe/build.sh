@@ -84,16 +84,23 @@ if [[ "${target_platform}" != "linux-"* ]] && [[ "${target_platform}" != "osx-"*
   # Add mingw-w64 bin directory to PATH for gcc discovery
   export PATH="$BUILD_PREFIX/Library/mingw-w64/bin:$BUILD_PREFIX/Library/bin:$PATH"
 
-  # Set CC/CXX with full paths for Dune to find gcc
-  # Dune uses CC/CXX environment variables for C compiler discovery
-  # Convert Windows backslashes to Unix forward slashes for MSYS2 compatibility
-  export CC="$(which x86_64-w64-mingw32-gcc.exe | sed 's|\\|/|g')"
-  export CXX="$(which x86_64-w64-mingw32-g++.exe | sed 's|\\|/|g')"
-  export AR="$(which x86_64-w64-mingw32-ar.exe | sed 's|\\|/|g')"
-  export RANLIB="$(which x86_64-w64-mingw32-ranlib.exe | sed 's|\\|/|g')"
+  # Resolve actual compiler paths and create dune-workspace
+  # Dune's foreign_stubs mechanism discovers C compiler through ocamlc -config, NOT CC env var
+  # We must provide actual resolved paths in dune-workspace for Dune to find them
+  GCC_PATH="$(which x86_64-w64-mingw32-gcc.exe | sed 's|\\|/|g')"
+  GXX_PATH="$(which x86_64-w64-mingw32-g++.exe | sed 's|\\|/|g')"
 
-  echo "DEBUG: CC=${CC}"
-  echo "DEBUG: CXX=${CXX}"
+  # Create dune-workspace with resolved paths (bash expands variables before writing)
+  cat > dune-workspace <<EOF
+(lang dune 2.0)
+(context
+ (default
+  (toolchain
+   (c $GCC_PATH)
+   (cxx $GXX_PATH))))
+EOF
+
+  echo "DEBUG: Created dune-workspace with GCC=$GCC_PATH"
 fi
 
 make
