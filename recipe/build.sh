@@ -13,9 +13,46 @@ else
   BZIP2=$(find ${_BUILD_PREFIX_} ${_PREFIX_} \( -name bzip2 -o -name bzip2.exe \) \( -type f -o -type l \) -perm /111 | head -1)
   export BUNZIP2="${BZIP2} -d"
   export CC64=false
+
+  # Ensure OCaml binaries are in PATH for dune bootstrap
+  export PATH="${BUILD_PREFIX}/bin:${BUILD_PREFIX}/Library/bin:${PATH}"
 fi
 
-./configure --prefix="${OPAM_INSTALL_PREFIX}" --with-vendored-deps || { cat config.log; exit 1; }
+# ==============================================================================
+# Cross-compilation setup for OCaml
+# ==============================================================================
+# When cross-compiling (build_platform != target_platform), we need to:
+# 1. Build dune with native compiler (it runs on build machine)
+# 2. Swap to cross-compiler for the main opam build
+
+if [[ "${target_platform}" != "${build_platform:-${target_platform}}" ]]; then
+  # Configure first (uses native tools for detection)
+  ./configure --prefix="${OPAM_INSTALL_PREFIX}" --with-vendored-deps || { cat config.log; exit 1; }
+
+  # Phase 1: Build dune with native compiler
+  make src_ext/dune-local/_boot/dune.exe
+
+  # Phase 2: Swap to cross-compilers for the main build
+  # Dune discovers compilers by looking for ocamlc/ocamlopt in PATH
+  # We swap the base and .opt variants to point to cross-compilers
+  pushd "${BUILD_PREFIX}/bin"
+    for tool in ocamlc ocamlopt ocamldep ocamlobjinfo; do
+      if [[ -f "${tool}" ]] || [[ -L "${tool}" ]]; then
+        mv "${tool}" "${tool}.build"
+        ln -sf "${CONDA_TOOLCHAIN_HOST}-${tool}" "${tool}"
+      fi
+      if [[ -f "${tool}.opt" ]] || [[ -L "${tool}.opt" ]]; then
+        mv "${tool}.opt" "${tool}.opt.build"
+        ln -sf "${CONDA_TOOLCHAIN_HOST}-${tool}.opt" "${tool}.opt"
+      fi
+    done
+  popd
+
+  # Set QEMU_LD_PREFIX for running any cross-compiled executables
+  export QEMU_LD_PREFIX="${BUILD_PREFIX}/${CONDA_TOOLCHAIN_HOST}/sysroot"
+else
+  ./configure --prefix="${OPAM_INSTALL_PREFIX}" --with-vendored-deps || { cat config.log; exit 1; }
+fi
 
 # ==============================================================================
 # Windows: Dune workarounds
@@ -43,9 +80,10 @@ if [[ "${target_platform}" != "linux-"* ]] && [[ "${target_platform}" != "osx-"*
   cat opamInject.c >> opam_stubs.c
   cat opamWindows.c >> opam_stubs.c
   popd > /dev/null
-  
+
   export PATH="${_BUILD_PREFIX_}\\Library\\bin;${PATH}"
 fi
 
 make
 make install
+exit 1  # DEBUG: preserve build artifacts for inspection
