@@ -96,8 +96,8 @@ if [[ "${target_platform}" != "linux-"* ]] && [[ "${target_platform}" != "osx-"*
 (context
  (default
   (toolchain
-   (c (exe ${BUILD_PREFIX}/Library/mingw-w64/bin/x86_64-w64-mingw32-gcc.exe))
-   (cxx (exe ${BUILD_PREFIX}/Library/mingw-w64/bin/x86_64-w64-mingw32-g++.exe)))))
+   (c "${BUILD_PREFIX}/Library/mingw-w64/bin/x86_64-w64-mingw32-gcc.exe")
+   (cxx "${BUILD_PREFIX}/Library/mingw-w64/bin/x86_64-w64-mingw32-g++.exe"))))
 EOF
 fi
 
