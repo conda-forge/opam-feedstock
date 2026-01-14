@@ -86,11 +86,11 @@ if [[ "${target_platform}" != "linux-"* ]] && [[ "${target_platform}" != "osx-"*
 
   # Set CC/CXX with full paths for Dune to find gcc
   # Dune uses CC/CXX environment variables for C compiler discovery
-  export CC="$(which x86_64-w64-mingw32-gcc)"
-  export CC="${_PREFIX}/Library/bin/x86_64-w64-mingw32-gcc.exe"
-  export CXX="$(which x86_64-w64-mingw32-g++)"
-  export AR="$(which x86_64-w64-mingw32-ar)"
-  export RANLIB="$(which x86_64-w64-mingw32-ranlib)"
+  # Convert Windows backslashes to Unix forward slashes for MSYS2 compatibility
+  export CC="$(which x86_64-w64-mingw32-gcc.exe | sed 's|\\|/|g')"
+  export CXX="$(which x86_64-w64-mingw32-g++.exe | sed 's|\\|/|g')"
+  export AR="$(which x86_64-w64-mingw32-ar.exe | sed 's|\\|/|g')"
+  export RANLIB="$(which x86_64-w64-mingw32-ranlib.exe | sed 's|\\|/|g')"
 
   echo "DEBUG: CC=${CC}"
   echo "DEBUG: CXX=${CXX}"
