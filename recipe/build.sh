@@ -82,6 +82,17 @@ if [[ "${target_platform}" != "linux-"* ]] && [[ "${target_platform}" != "osx-"*
   popd > /dev/null
 
   export PATH="${_BUILD_PREFIX_}\\Library\\bin;${PATH}"
+
+  # DEBUG: Find where gcc executables actually are
+  echo "=== DEBUG: Searching for x86_64-w64-mingw32-gcc.exe ==="
+  find "${_BUILD_PREFIX_}" "${_PREFIX_}" -name "x86_64-w64-mingw32-gcc.exe" -type f 2>/dev/null || echo "NOT FOUND in BUILD_PREFIX or PREFIX"
+  find "${_BUILD_PREFIX_}" "${_PREFIX_}" -name "*gcc*.exe" -type f 2>/dev/null | head -10
+  echo "=== DEBUG: Current PATH ==="
+  echo "${PATH}" | tr ';' '\n'
+  echo "=== DEBUG: which gcc ==="
+  which gcc.exe || echo "gcc.exe not in PATH"
+  which x86_64-w64-mingw32-gcc.exe || echo "x86_64-w64-mingw32-gcc.exe not in PATH"
+  echo "==========================="
 fi
 
 make
