@@ -24,11 +24,18 @@ else
   if [[ -f "${OCAML_CONFIG}" ]]; then
     # The OCaml package has hardcoded paths from its conda-forge build environment
     # These paths don't exist on the opam build machine, so we need to fix them
-    # Convert BUILD_PREFIX backslashes to forward slashes for sed (Windows paths use backslashes)
-    BUILD_PREFIX_UNIX=$(echo "${BUILD_PREFIX}" | sed 's|\\|/|g')
-    # Replace any path ending in x86_64-w64-mingw32-gcc.exe with current BUILD_PREFIX path
-    sed -i "s|[A-Za-z]:[^= ]*x86_64-w64-mingw32-gcc\.exe|${BUILD_PREFIX_UNIX}/Library/bin/x86_64-w64-mingw32-gcc.exe|g" "${OCAML_CONFIG}"
-    echo "Patched OCaml Makefile.config with full gcc path:"
+    # Use 'which' to get the actual path to gcc (avoids variable expansion issues)
+    GCC_PATH=$(which x86_64-w64-mingw32-gcc.exe 2>/dev/null || which x86_64-w64-mingw32-gcc 2>/dev/null || echo "")
+    echo "DEBUG: Found gcc at: ${GCC_PATH}"
+    echo "DEBUG: BUILD_PREFIX=${BUILD_PREFIX}"
+    if [[ -n "${GCC_PATH}" ]]; then
+      # Replace any absolute path to gcc with the actual found path
+      sed -i "s|[A-Za-z]:[^= ]*x86_64-w64-mingw32-gcc[^= ]*|${GCC_PATH}|g" "${OCAML_CONFIG}"
+      echo "Patched OCaml Makefile.config with gcc path: ${GCC_PATH}"
+    else
+      echo "WARNING: Could not find x86_64-w64-mingw32-gcc in PATH"
+    fi
+    echo "DEBUG: CC lines after patch:"
     grep "CC" "${OCAML_CONFIG}" | head -5
   else
     echo "WARNING: ${OCAML_CONFIG} not found"
