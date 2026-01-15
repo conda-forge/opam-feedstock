@@ -88,12 +88,16 @@ if [[ "${target_platform}" != "linux-"* ]] && [[ "${target_platform}" != "osx-"*
   echo "DEBUG: ocamlc -config relevant fields:"
   ocamlc -config | grep -E '(native_c_compiler|bytecomp_c_compiler|native_c_libraries|bytecomp_c_libraries)'
 
-  # Verify compiler is findable
-  echo "DEBUG: which x86_64-w64-mingw32-gcc.exe:"
-  which x86_64-w64-mingw32-gcc.exe || echo "NOT FOUND IN PATH"
+  # Dune's subprocess doesn't inherit PATH properly on Windows/MSYS2
+  # Copy compiler to source tree where Dune searches
+  echo "DEBUG: Copying compiler to source tree for Dune to find"
+  cp "$BUILD_PREFIX/Library/bin/x86_64-w64-mingw32-gcc.exe" ./
+  cp "$BUILD_PREFIX/Library/bin/x86_64-w64-mingw32-g++.exe" ./
+  cp "$BUILD_PREFIX/Library/bin/x86_64-w64-mingw32-ar.exe" ./
+  cp "$BUILD_PREFIX/Library/bin/x86_64-w64-mingw32-ranlib.exe" ./
 
-  echo "DEBUG: Testing if gcc works:"
-  x86_64-w64-mingw32-gcc.exe --version 2>&1 | head -1 || echo "EXECUTION FAILED"
+  echo "DEBUG: Compiler copied, verifying:"
+  ls -la x86_64-w64-mingw32-gcc.exe
 fi
 
 make
