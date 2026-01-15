@@ -14,43 +14,21 @@ else
   export BUNZIP2="${BZIP2} -d"
   export CC64=false
 
-  # Ensure OCaml binaries are in PATH for dune bootstrap
-  export PATH="${BUILD_PREFIX}/bin:${BUILD_PREFIX}/Library/bin:${PATH}"
-
-  # REAL FIX: Dune's compiler discovery ignores shell PATH.
-  # It looks for the compiler "in the tree" (source dir) or via its own PATH search.
-  # Patching Makefile.config is useless because ocamlc has paths compiled in.
+  # Ensure OCaml binaries AND MinGW gcc are in PATH for dune bootstrap
+  # Dune uses Bin.which to search PATH - it DOES respect PATH (contrary to old comments)
+  # The copy workaround was broken because gcc needs cc1 from lib/gcc/...
   #
-  # Solution: Copy/symlink gcc to the source tree where Dune will find it.
-  echo "=== Dune compiler workaround: copying gcc to source tree ==="
+  # Key directories:
+  # - BUILD_PREFIX/Library/bin: contains x86_64-w64-mingw32-gcc.exe
+  # - BUILD_PREFIX/Library/mingw-w64/bin: alternative MinGW location
+  # - BUILD_PREFIX/bin: OCaml tools
+  export PATH="${BUILD_PREFIX}/Library/bin:${BUILD_PREFIX}/Library/mingw-w64/bin:${BUILD_PREFIX}/bin:${PATH}"
 
-  # Create a bin directory in the source tree
-  mkdir -p _dune_compilers
-
-  # Copy the actual gcc.exe and related tools to where Dune can find them
-  # Use the CC variable which conda sets correctly
-  if [[ -n "${CC}" ]]; then
-    CC_DIR=$(dirname "$(command -v ${CC})")
-    echo "DEBUG: CC=${CC}, CC_DIR=${CC_DIR}"
-
-    # Copy compilers to source tree
-    for tool in gcc g++ cpp ar as ld nm objcopy objdump ranlib strip windres; do
-      SRC="${CC_DIR}/x86_64-w64-mingw32-${tool}.exe"
-      if [[ -f "${SRC}" ]]; then
-        cp "${SRC}" "_dune_compilers/x86_64-w64-mingw32-${tool}.exe"
-        # Also create version without prefix for Dune
-        cp "${SRC}" "_dune_compilers/${tool}.exe" 2>/dev/null || true
-      fi
-    done
-
-    # Add to PATH so Dune's PATH search also finds them
-    export PATH="$(pwd)/_dune_compilers:${PATH}"
-    echo "DEBUG: Added _dune_compilers to PATH"
-    ls -la _dune_compilers/ | head -10
-  else
-    echo "ERROR: CC not set!"
-    exit 1
-  fi
+  echo "=== Windows PATH setup (no copy workaround - gcc needs its full toolchain) ==="
+  echo "PATH includes:"
+  echo "  - ${BUILD_PREFIX}/Library/bin"
+  echo "  - ${BUILD_PREFIX}/Library/mingw-w64/bin"
+  echo "  - ${BUILD_PREFIX}/bin"
 fi
 
 # ==============================================================================
