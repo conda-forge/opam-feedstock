@@ -25,7 +25,9 @@ else
     # The OCaml package has hardcoded paths from its conda-forge build environment
     # These paths don't exist on the opam build machine, so we need to fix them
     # Use 'which' to get the actual path to gcc (avoids variable expansion issues)
+    # Convert backslashes to forward slashes to prevent sed escape sequence issues
     GCC_PATH=$(which x86_64-w64-mingw32-gcc.exe 2>/dev/null || which x86_64-w64-mingw32-gcc 2>/dev/null || echo "")
+    GCC_PATH=$(echo "${GCC_PATH}" | tr '\\' '/')
     echo "DEBUG: Found gcc at: ${GCC_PATH}"
     echo "DEBUG: BUILD_PREFIX=${BUILD_PREFIX}"
     if [[ -n "${GCC_PATH}" ]]; then
