@@ -17,32 +17,39 @@ else
   # Ensure OCaml binaries are in PATH for dune bootstrap
   export PATH="${BUILD_PREFIX}/bin:${BUILD_PREFIX}/Library/bin:${PATH}"
 
-  # Patch OCaml's Makefile.config to use full path for C compiler
-  # Dune reads this config and needs the full path to find gcc on Windows
+  # REAL FIX: Dune's compiler discovery ignores shell PATH.
+  # It looks for the compiler "in the tree" (source dir) or via its own PATH search.
+  # Patching Makefile.config is useless because ocamlc has paths compiled in.
   #
-  # Note: rattler-build doesn't reliably set BUILD_PREFIX/_BUILD_PREFIX_ on Windows.
-  # Instead, we find gcc by searching the filesystem.
+  # Solution: Copy/symlink gcc to the source tree where Dune will find it.
+  echo "=== Dune compiler workaround: copying gcc to source tree ==="
 
-  # Find the OCaml Makefile.config in the build environment
-  OCAML_CONFIG=$(find / -path "*/Library/lib/ocaml/Makefile.config" 2>/dev/null | head -1)
-  echo "DEBUG: Found OCAML_CONFIG at: ${OCAML_CONFIG}"
+  # Create a bin directory in the source tree
+  mkdir -p _dune_compilers
 
-  if [[ -f "${OCAML_CONFIG}" ]]; then
-    # Find gcc.exe in the build environment
-    GCC_PATH=$(find / -path "*/Library/bin/x86_64-w64-mingw32-gcc.exe" 2>/dev/null | head -1)
-    echo "DEBUG: Found gcc at: ${GCC_PATH}"
-    if [[ -n "${GCC_PATH}" ]]; then
-      # Replace any absolute path to gcc with the actual found path
-      sed -i "s|[A-Za-z]:[^= ]*x86_64-w64-mingw32-gcc[^= ]*|${GCC_PATH}|g" "${OCAML_CONFIG}"
-      echo "Patched OCaml Makefile.config with gcc path: ${GCC_PATH}"
-    else
-      echo "WARNING: Could not find x86_64-w64-mingw32-gcc in PATH"
-    fi
-    echo "DEBUG: CC lines after patch:"
-    grep "CC" "${OCAML_CONFIG}" | head -5
+  # Copy the actual gcc.exe and related tools to where Dune can find them
+  # Use the CC variable which conda sets correctly
+  if [[ -n "${CC}" ]]; then
+    CC_DIR=$(dirname "$(command -v ${CC})")
+    echo "DEBUG: CC=${CC}, CC_DIR=${CC_DIR}"
+
+    # Copy compilers to source tree
+    for tool in gcc g++ cpp ar as ld nm objcopy objdump ranlib strip windres; do
+      SRC="${CC_DIR}/x86_64-w64-mingw32-${tool}.exe"
+      if [[ -f "${SRC}" ]]; then
+        cp "${SRC}" "_dune_compilers/x86_64-w64-mingw32-${tool}.exe"
+        # Also create version without prefix for Dune
+        cp "${SRC}" "_dune_compilers/${tool}.exe" 2>/dev/null || true
+      fi
+    done
+
+    # Add to PATH so Dune's PATH search also finds them
+    export PATH="$(pwd)/_dune_compilers:${PATH}"
+    echo "DEBUG: Added _dune_compilers to PATH"
+    ls -la _dune_compilers/ | head -10
   else
-    echo "WARNING: ${OCAML_CONFIG} not found"
-    ls -la "${BUILD_PREFIX}/lib/" 2>/dev/null || true
+    echo "ERROR: CC not set!"
+    exit 1
   fi
 fi
 
@@ -102,39 +109,135 @@ fi
 
 if [[ "${target_platform}" != "linux-"* ]] && [[ "${target_platform}" != "osx-"* ]]; then
   # ---------------------------------------------------------------------------
-  # DEBUG: Comprehensive environment dump
+  # DEBUG: Comprehensive environment dump - UNDERSTANDING DUNE'S SEARCH
   # ---------------------------------------------------------------------------
   echo "========================================"
   echo "DEBUG: Windows build environment"
   echo "========================================"
   echo ""
-  echo "=== Full ocamlc -config output ==="
-  ocamlc -config
+
+  # CRITICAL: What does ocamlc -config say about the C compiler?
+  echo "=== OCaml's C Compiler Configuration ==="
+  echo "This is what Dune reads to find the compiler:"
+  OCAML_C_COMPILER=$(ocamlc -config | grep "^c_compiler:" | sed 's/c_compiler: //')
+  echo "  c_compiler: '${OCAML_C_COMPILER}'"
   echo ""
-  echo "=== Key compiler-related config entries ==="
-  ocamlc -config | grep -E "(c_compiler|native_c_compiler|bytecomp_c_compiler|native_pack_linker|asm|ccomp_type|architecture|system|target)"
+
+  # Does it have a path or just a name?
+  if [[ "${OCAML_C_COMPILER}" == */* ]] || [[ "${OCAML_C_COMPILER}" == *\\* ]]; then
+    echo "  -> Contains path separator - Dune will try to use as-is"
+    echo "  -> Checking if file exists at that path:"
+    if [[ -f "${OCAML_C_COMPILER}" ]]; then
+      echo "     EXISTS: $(ls -la "${OCAML_C_COMPILER}")"
+    else
+      echo "     DOES NOT EXIST at '${OCAML_C_COMPILER}'"
+      # Try with .exe
+      if [[ -f "${OCAML_C_COMPILER}.exe" ]]; then
+        echo "     BUT EXISTS WITH .exe: $(ls -la "${OCAML_C_COMPILER}.exe")"
+      fi
+    fi
+  else
+    echo "  -> Just a name (no path) - Dune will search PATH using Bin.which"
+  fi
   echo ""
+
+  # Show ALL compiler-related config
+  echo "=== All compiler-related ocamlc -config entries ==="
+  ocamlc -config | grep -E "(c_compiler|native_c_compiler|bytecomp_c_compiler|native_pack_linker|asm|ccomp_type|architecture|system|target|standard_library)"
+  echo ""
+
+  # Environment variables
   echo "=== Environment variables ==="
   echo "CC=${CC:-<unset>}"
   echo "CXX=${CXX:-<unset>}"
   echo "BUILD_PREFIX=${BUILD_PREFIX}"
+  echo "_BUILD_PREFIX_=${_BUILD_PREFIX_:-<unset>}"
   echo "PREFIX=${PREFIX}"
+  echo "_PREFIX_=${_PREFIX_:-<unset>}"
   echo ""
-  echo "=== PATH (first 10 entries) ==="
-  echo "${PATH}" | tr ':' '\n' | head -10
+
+  # CRITICAL: Show FULL PATH (Dune's Bin.which iterates through this)
+  echo "=== FULL PATH (Dune searches these IN ORDER) ==="
+  echo "${PATH}" | tr ':' '\n' | nl -ba
   echo ""
-  echo "=== Searching for gcc executables ==="
-  echo "In BUILD_PREFIX/Library/bin:"
-  ls -la "${BUILD_PREFIX}/Library/bin/"*gcc* 2>/dev/null || echo "  (none found)"
-  echo "In BUILD_PREFIX/Library/mingw-w64/bin:"
-  ls -la "${BUILD_PREFIX}/Library/mingw-w64/bin/"*gcc* 2>/dev/null || echo "  (none found)"
-  echo "In BUILD_PREFIX/bin:"
-  ls -la "${BUILD_PREFIX}/bin/"*gcc* 2>/dev/null || echo "  (none found)"
+
+  # Now manually simulate what Dune's Bin.which does
+  echo "=== Simulating Dune's Bin.which for '${OCAML_C_COMPILER}' ==="
+  SEARCH_NAME="${OCAML_C_COMPILER}"
+  SEARCH_NAME_EXE="${OCAML_C_COMPILER}.exe"
+
+  echo "Searching for: '${SEARCH_NAME}' or '${SEARCH_NAME_EXE}'"
   echo ""
-  echo "=== which gcc variants ==="
-  which gcc 2>/dev/null || echo "gcc: not found"
-  which x86_64-w64-mingw32-gcc 2>/dev/null || echo "x86_64-w64-mingw32-gcc: not found"
-  which x86_64-w64-mingw32-gcc.exe 2>/dev/null || echo "x86_64-w64-mingw32-gcc.exe: not found"
+
+  FOUND_AT=""
+  IFS=':' read -ra PATH_DIRS <<< "${PATH}"
+  for i in "${!PATH_DIRS[@]}"; do
+    DIR="${PATH_DIRS[$i]}"
+    if [[ -z "${DIR}" ]]; then
+      echo "  [$((i+1))] (empty entry, skipped)"
+      continue
+    fi
+
+    # Check without .exe
+    CANDIDATE="${DIR}/${SEARCH_NAME}"
+    if [[ -f "${CANDIDATE}" ]]; then
+      echo "  [$((i+1))] FOUND: ${CANDIDATE}"
+      ls -la "${CANDIDATE}" 2>/dev/null || true
+      FOUND_AT="${CANDIDATE}"
+      break
+    fi
+
+    # Check with .exe (Dune does this on Windows)
+    CANDIDATE_EXE="${DIR}/${SEARCH_NAME_EXE}"
+    if [[ -f "${CANDIDATE_EXE}" ]]; then
+      echo "  [$((i+1))] FOUND (.exe): ${CANDIDATE_EXE}"
+      ls -la "${CANDIDATE_EXE}" 2>/dev/null || true
+      FOUND_AT="${CANDIDATE_EXE}"
+      break
+    fi
+
+    # Show what's NOT there
+    echo "  [$((i+1))] NOT in: ${DIR}/"
+  done
+
+  if [[ -z "${FOUND_AT}" ]]; then
+    echo ""
+    echo "  *** NOT FOUND IN ANY PATH DIRECTORY ***"
+  fi
+  echo ""
+
+  # Show what gcc files actually exist
+  echo "=== Actual gcc files in key locations ==="
+  for DIR in "${BUILD_PREFIX}/Library/bin" "${BUILD_PREFIX}/Library/mingw-w64/bin" "${BUILD_PREFIX}/bin" "${_BUILD_PREFIX_}/Library/bin" "${_BUILD_PREFIX_}/Library/mingw-w64/bin"; do
+    if [[ -d "${DIR}" ]]; then
+      echo "In ${DIR}:"
+      ls -la "${DIR}/"*gcc* 2>/dev/null | head -5 || echo "  (no gcc found)"
+    fi
+  done
+  echo ""
+
+  # Test if 'which' can find it (bash's PATH search)
+  echo "=== Bash 'which' and 'command -v' tests ==="
+  echo "which ${OCAML_C_COMPILER}:"
+  which "${OCAML_C_COMPILER}" 2>&1 || echo "  (not found)"
+  echo "which ${OCAML_C_COMPILER}.exe:"
+  which "${OCAML_C_COMPILER}.exe" 2>&1 || echo "  (not found)"
+  echo "command -v ${OCAML_C_COMPILER}:"
+  command -v "${OCAML_C_COMPILER}" 2>&1 || echo "  (not found)"
+  echo ""
+
+  # Test if it's executable (could be found but not executable)
+  echo "=== Executability test ==="
+  if command -v "${OCAML_C_COMPILER}" &>/dev/null; then
+    FOUND_PATH=$(command -v "${OCAML_C_COMPILER}")
+    echo "Found at: ${FOUND_PATH}"
+    echo "Permissions: $(ls -la "${FOUND_PATH}")"
+    echo "File type: $(file "${FOUND_PATH}" 2>/dev/null || echo "unknown")"
+    echo "Running --version:"
+    "${FOUND_PATH}" --version 2>&1 | head -2 || echo "  (failed to run)"
+  else
+    echo "Cannot test executability - compiler not found in PATH"
+  fi
   echo "========================================"
   echo ""
 
@@ -255,8 +358,70 @@ if [[ "${target_platform}" != "linux-"* ]] && [[ "${target_platform}" != "osx-"*
   echo "========================================"
   echo ""
 
+  # ---------------------------------------------------------------------------
+  # DEBUG: Understand Dune's internal environment
+  # ---------------------------------------------------------------------------
+  echo ""
+  echo "========================================"
+  echo "DEBUG: Dune's perspective"
+  echo "========================================"
+
+  # Check if Dune has internal debug flags
+  echo "=== Dune version and capabilities ==="
+  dune --version 2>/dev/null || echo "dune command not available yet"
+
+  # Check PATH in Windows format (semicolons)
+  echo ""
+  echo "=== PATH in Windows format (Dune might use this) ==="
+  # On MSYS2, PATH uses colons internally but Windows uses semicolons
+  echo "MSYS PATH (colons): ${PATH:0:200}..."
+  # Convert to Windows format
+  if command -v cygpath &>/dev/null; then
+    echo "Windows PATH available via cygpath"
+  fi
+
+  # Check Dune's own PATH handling
+  echo ""
+  echo "=== Test: Can OCaml programs execute the compiler? ==="
+  # This tests if OCaml's subprocess spawning can find the compiler
+  cat > /tmp/test_cc.ml << 'OCAML_EOF'
+let () =
+  let config = Sys.command "ocamlc -config" in
+  Printf.printf "ocamlc -config exit code: %d\n" config;
+  (* Try to run the C compiler *)
+  let cc_line =
+    let ic = Unix.open_process_in "ocamlc -config" in
+    let rec find () =
+      try
+        let line = input_line ic in
+        if String.length line > 12 && String.sub line 0 12 = "c_compiler: " then
+          String.sub line 12 (String.length line - 12)
+        else find ()
+      with End_of_file -> ""
+    in
+    let result = find () in
+    ignore (Unix.close_process_in ic);
+    result
+  in
+  Printf.printf "c_compiler from config: '%s'\n" cc_line;
+  if cc_line <> "" then begin
+    Printf.printf "Attempting to run: %s --version\n" cc_line;
+    let exit_code = Sys.command (cc_line ^ " --version") in
+    Printf.printf "Exit code: %d\n" exit_code
+  end
+OCAML_EOF
+  echo "Running OCaml test to see if OCaml can spawn the compiler:"
+  ocaml unix.cma /tmp/test_cc.ml 2>&1 || echo "(OCaml test failed)"
+
+  echo "========================================"
+  echo ""
+
   # Enable Dune verbose output to see exactly what it's searching for
   export DUNE_ARGS="--verbose"
+
+  # Also set --force to ensure it re-checks everything
+  # And --debug-findlib to see library searching
+  export DUNE_ARGS="--verbose --debug-findlib"
 fi
 
 echo ""
