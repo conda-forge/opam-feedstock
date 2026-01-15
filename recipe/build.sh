@@ -396,10 +396,6 @@ OCAML_EOF
 
   # Enable Dune verbose output to see exactly what it's searching for
   export DUNE_ARGS="--verbose"
-
-  # Also set --force to ensure it re-checks everything
-  # And --debug-findlib to see library searching
-  export DUNE_ARGS="--verbose --debug-findlib"
 fi
 
 echo ""
