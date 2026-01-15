@@ -29,6 +29,10 @@ else
   echo "  - ${BUILD_PREFIX}/Library/bin"
   echo "  - ${BUILD_PREFIX}/Library/mingw-w64/bin"
   echo "  - ${BUILD_PREFIX}/bin"
+
+  # Make ocamlopt verbose to see ar/as/ld commands for debugging archive creation
+  export OCAMLPARAM="verbose=1,_"
+  echo "OCAMLPARAM=${OCAMLPARAM} (ocamlopt will show external commands)"
 fi
 
 # ==============================================================================
@@ -53,9 +57,10 @@ if [[ "${target_platform}" != "${build_platform:-${target_platform}}" ]]; then
   ocamlc -config
   (
     export CONDA_OCAML_AS="${CONDA_TOOLCHAIN_BUILD}"-as
-    export CONDA_OCAML_AR="${CONDA_TOOLCHAIN_BUILD}"-ar
+    export CONDA_OCAML_AR="${CONDA_TOOLCHAIN_BUILD}"-gcc-ar
     export CONDA_OCAML_CC="${CONDA_TOOLCHAIN_BUILD}"-gcc
     export CONDA_OCAML_LD="${CONDA_TOOLCHAIN_BUILD}"-ld
+    export CONDA_OCAML_RANLIB="${CONDA_TOOLCHAIN_BUILD}"-gcc-ranlib
     make src_ext/dune-local/_boot/dune.exe
   )
   ocamlc -config | grep target
