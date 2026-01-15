@@ -408,5 +408,52 @@ echo "========================================"
 echo "Starting make with DUNE_ARGS=${DUNE_ARGS:-<default>}"
 echo "========================================"
 
-make
+if ! make; then
+  echo ""
+  echo "========================================"
+  echo "DEBUG: make failed - checking .o files for opam_client"
+  echo "========================================"
+
+  # Check if the opam_client .o files exist
+  OBJ_DIR="_build/default/src/client/.opam_client.objs/native"
+  if [[ -d "${OBJ_DIR}" ]]; then
+    echo "=== Contents of ${OBJ_DIR} ==="
+    ls -la "${OBJ_DIR}/"*.o 2>/dev/null | head -30 || echo "(no .o files found)"
+    echo ""
+    echo "=== Count of .o files ==="
+    ls "${OBJ_DIR}/"*.o 2>/dev/null | wc -l || echo "0"
+  else
+    echo "Directory ${OBJ_DIR} does not exist!"
+  fi
+
+  # Test ar directly with a simple case
+  echo ""
+  echo "=== Testing ar.exe directly ==="
+  which x86_64-w64-mingw32-ar.exe 2>/dev/null || which ar.exe 2>/dev/null || echo "ar not found"
+
+  # Try creating a simple archive
+  if [[ -d "${OBJ_DIR}" ]]; then
+    FIRST_O=$(ls "${OBJ_DIR}/"*.o 2>/dev/null | head -1)
+    if [[ -n "${FIRST_O}" ]]; then
+      echo "Testing ar with single file: ${FIRST_O}"
+      x86_64-w64-mingw32-ar.exe rc /tmp/test_archive.a "${FIRST_O}" 2>&1 && echo "Single file archive: SUCCESS" || echo "Single file archive: FAILED"
+
+      # Try with first 5 files
+      echo ""
+      echo "Testing ar with first 5 .o files:"
+      FIVE_O=$(ls "${OBJ_DIR}/"*.o 2>/dev/null | head -5 | tr '\n' ' ')
+      x86_64-w64-mingw32-ar.exe rc /tmp/test_archive5.a ${FIVE_O} 2>&1 && echo "5 file archive: SUCCESS" || echo "5 file archive: FAILED"
+
+      # Try with all files
+      echo ""
+      echo "Testing ar with all .o files:"
+      ALL_O=$(ls "${OBJ_DIR}/"*.o 2>/dev/null | tr '\n' ' ')
+      x86_64-w64-mingw32-ar.exe rc /tmp/test_archive_all.a ${ALL_O} 2>&1 && echo "All files archive: SUCCESS" || echo "All files archive: FAILED with exit code $?"
+    fi
+  fi
+
+  echo "========================================"
+  exit 1
+fi
+
 make install
