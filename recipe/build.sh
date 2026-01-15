@@ -65,6 +65,10 @@ if [[ "${target_platform}" != "linux-"* ]] && [[ "${target_platform}" != "osx-"*
   sed -i '/^(rule$/,/cc64)))/d' src/core/dune
   sed -i '/^(install$/,/opam-putenv\.exe))/d' src/core/dune
 
+  # Remove foreign_stubs section - Dune can't find compiler on Windows/MSYS2
+  # C stubs are handled manually below with opam_stubs.c workaround
+  sed -i '/^(foreign_stubs$/,/c-libraries\.sexp)))/d' src/core/dune
+
   # Pre-create generated .ml files that dune has trouble with
   echo "let value = \"\"" > src/core/opamCoreConfigDeveloper.ml
   echo "let version = \"${PKG_VERSION}\"" > src/core/opamVersionInfo.ml
@@ -83,21 +87,6 @@ if [[ "${target_platform}" != "linux-"* ]] && [[ "${target_platform}" != "osx-"*
 
   # Add mingw-w64 bin directory to PATH for gcc discovery
   export PATH="$BUILD_PREFIX/Library/mingw-w64/bin:$BUILD_PREFIX/Library/bin:$PATH"
-
-  # DEBUG: Check what OCaml thinks the C compiler is
-  echo "DEBUG: ocamlc -config relevant fields:"
-  ocamlc -config | grep -E '(native_c_compiler|bytecomp_c_compiler|native_c_libraries|bytecomp_c_libraries)'
-
-  # Dune's subprocess doesn't inherit PATH properly on Windows/MSYS2
-  # Copy compiler to source tree where Dune searches
-  echo "DEBUG: Copying compiler to source tree for Dune to find"
-  cp "$BUILD_PREFIX/Library/bin/x86_64-w64-mingw32-gcc.exe" ./
-  cp "$BUILD_PREFIX/Library/bin/x86_64-w64-mingw32-g++.exe" ./
-  cp "$BUILD_PREFIX/Library/bin/x86_64-w64-mingw32-ar.exe" ./
-  cp "$BUILD_PREFIX/Library/bin/x86_64-w64-mingw32-ranlib.exe" ./
-
-  echo "DEBUG: Compiler copied, verifying:"
-  ls -la x86_64-w64-mingw32-gcc.exe
 fi
 
 make
