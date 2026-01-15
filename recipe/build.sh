@@ -74,6 +74,43 @@ fi
 
 if [[ "${target_platform}" != "linux-"* ]] && [[ "${target_platform}" != "osx-"* ]]; then
   # ---------------------------------------------------------------------------
+  # DEBUG: Comprehensive environment dump
+  # ---------------------------------------------------------------------------
+  echo "========================================"
+  echo "DEBUG: Windows build environment"
+  echo "========================================"
+  echo ""
+  echo "=== Full ocamlc -config output ==="
+  ocamlc -config
+  echo ""
+  echo "=== Key compiler-related config entries ==="
+  ocamlc -config | grep -E "(c_compiler|native_c_compiler|bytecomp_c_compiler|native_pack_linker|asm|ccomp_type|architecture|system|target)"
+  echo ""
+  echo "=== Environment variables ==="
+  echo "CC=${CC:-<unset>}"
+  echo "CXX=${CXX:-<unset>}"
+  echo "BUILD_PREFIX=${BUILD_PREFIX}"
+  echo "PREFIX=${PREFIX}"
+  echo ""
+  echo "=== PATH (first 10 entries) ==="
+  echo "${PATH}" | tr ':' '\n' | head -10
+  echo ""
+  echo "=== Searching for gcc executables ==="
+  echo "In BUILD_PREFIX/Library/bin:"
+  ls -la "${BUILD_PREFIX}/Library/bin/"*gcc* 2>/dev/null || echo "  (none found)"
+  echo "In BUILD_PREFIX/Library/mingw-w64/bin:"
+  ls -la "${BUILD_PREFIX}/Library/mingw-w64/bin/"*gcc* 2>/dev/null || echo "  (none found)"
+  echo "In BUILD_PREFIX/bin:"
+  ls -la "${BUILD_PREFIX}/bin/"*gcc* 2>/dev/null || echo "  (none found)"
+  echo ""
+  echo "=== which gcc variants ==="
+  which gcc 2>/dev/null || echo "gcc: not found"
+  which x86_64-w64-mingw32-gcc 2>/dev/null || echo "x86_64-w64-mingw32-gcc: not found"
+  which x86_64-w64-mingw32-gcc.exe 2>/dev/null || echo "x86_64-w64-mingw32-gcc.exe: not found"
+  echo "========================================"
+  echo ""
+
+  # ---------------------------------------------------------------------------
   # Step 1: Ensure Dune can find the C compiler
   # ---------------------------------------------------------------------------
   # Dune reads OCaml's -config to get the C compiler name (e.g., x86_64-w64-mingw32-gcc)
@@ -169,7 +206,35 @@ if [[ "${target_platform}" != "linux-"* ]] && [[ "${target_platform}" != "osx-"*
   cat opamInject.c >> opam_stubs.c
   cat opamWindows.c >> opam_stubs.c
   popd > /dev/null
+
+  # ---------------------------------------------------------------------------
+  # DEBUG: Environment right before make
+  # ---------------------------------------------------------------------------
+  echo ""
+  echo "========================================"
+  echo "DEBUG: Environment right before make"
+  echo "========================================"
+  echo "=== Final PATH check for expected compiler ==="
+  echo "Looking for: ${EXPECTED_CC}"
+  which "${EXPECTED_CC}" 2>/dev/null && echo "Found in PATH!" || echo "NOT FOUND in PATH"
+  which "${EXPECTED_CC}.exe" 2>/dev/null && echo "Found .exe in PATH!" || echo ".exe NOT FOUND in PATH"
+  echo ""
+  echo "=== Checking if it's executable ==="
+  if command -v "${EXPECTED_CC}" &>/dev/null; then
+    echo "command -v finds it: $(command -v "${EXPECTED_CC}")"
+    "${EXPECTED_CC}" --version 2>&1 | head -1 || echo "Failed to run --version"
+  fi
+  echo "========================================"
+  echo ""
+
+  # Enable Dune verbose output to see exactly what it's searching for
+  export DUNE_ARGS="--verbose"
 fi
+
+echo ""
+echo "========================================"
+echo "Starting make with DUNE_ARGS=${DUNE_ARGS:-<default>}"
+echo "========================================"
 
 make
 make install
