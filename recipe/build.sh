@@ -22,9 +22,10 @@ else
   # On Windows conda, the path is Library/lib/ocaml/ (not just lib/ocaml/)
   OCAML_CONFIG="${BUILD_PREFIX}/Library/lib/ocaml/Makefile.config"
   if [[ -f "${OCAML_CONFIG}" ]]; then
-    # Replace bare gcc name with full path (use forward slashes for MSYS2 compatibility)
-    # Use assignment context (=gcc) to avoid recursive replacement
-    sed -i "s|=x86_64-w64-mingw32-gcc|=${BUILD_PREFIX}/Library/bin/x86_64-w64-mingw32-gcc.exe|g" "${OCAML_CONFIG}"
+    # The OCaml package has hardcoded paths from its conda-forge build environment
+    # These paths don't exist on the opam build machine, so we need to fix them
+    # Replace any path ending in x86_64-w64-mingw32-gcc.exe with current BUILD_PREFIX path
+    sed -i "s|[A-Za-z]:[^= ]*x86_64-w64-mingw32-gcc\.exe|${BUILD_PREFIX}/Library/bin/x86_64-w64-mingw32-gcc.exe|g" "${OCAML_CONFIG}"
     echo "Patched OCaml Makefile.config with full gcc path:"
     grep "CC" "${OCAML_CONFIG}" | head -5
   else
