@@ -19,21 +19,21 @@ else
 
   # Patch OCaml's Makefile.config to use full path for C compiler
   # Dune reads this config and needs the full path to find gcc on Windows
-  # On Windows conda, the path is Library/lib/ocaml/ (not just lib/ocaml/)
-  OCAML_CONFIG="${BUILD_PREFIX}/Library/lib/ocaml/Makefile.config"
+  # On Windows conda, use _BUILD_PREFIX_ (with underscores) and path is Library/lib/ocaml/
+  OCAML_CONFIG="${_BUILD_PREFIX_}/Library/lib/ocaml/Makefile.config"
   if [[ -f "${OCAML_CONFIG}" ]]; then
     # The OCaml package has hardcoded paths from its conda-forge build environment
     # These paths don't exist on the opam build machine, so we need to fix them
-    # Construct gcc path from BUILD_PREFIX and convert to Unix-style path
+    # Construct gcc path from _BUILD_PREFIX_ and convert to Unix-style path
     # Use cygpath if available (MSYS2), otherwise tr for backslash conversion
-    GCC_EXE="${BUILD_PREFIX}/Library/bin/x86_64-w64-mingw32-gcc.exe"
+    GCC_EXE="${_BUILD_PREFIX_}/Library/bin/x86_64-w64-mingw32-gcc.exe"
     if command -v cygpath &>/dev/null; then
       GCC_PATH=$(cygpath -u "${GCC_EXE}")
     else
       GCC_PATH=$(echo "${GCC_EXE}" | tr '\\' '/')
     fi
     echo "DEBUG: Found gcc at: ${GCC_PATH}"
-    echo "DEBUG: BUILD_PREFIX=${BUILD_PREFIX}"
+    echo "DEBUG: _BUILD_PREFIX_=${_BUILD_PREFIX_}"
     if [[ -n "${GCC_PATH}" ]]; then
       # Replace any absolute path to gcc with the actual found path
       sed -i "s|[A-Za-z]:[^= ]*x86_64-w64-mingw32-gcc[^= ]*|${GCC_PATH}|g" "${OCAML_CONFIG}"
