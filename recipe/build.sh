@@ -16,11 +16,19 @@ else
 
   # Ensure OCaml binaries are in PATH for dune bootstrap
   export PATH="${BUILD_PREFIX}/bin:${BUILD_PREFIX}/Library/bin:${PATH}"
-  
-  # Replace CC=x86_64-w64-mingw32-gcc with full path
-  sed -i "s|x86_64-w64-mingw32-gcc|${BUILD_PREFIX}\\Library\\bin\\x86_64-w64-mingw32-gcc|" "${OCAML_CONFIG}"
-  echo "Patched OCaml Makefile.config with full gcc path"
-  grep "^CC=" "${OCAML_CONFIG}"
+
+  # Patch OCaml's Makefile.config to use full path for C compiler
+  # Dune reads this config and needs the full path to find gcc on Windows
+  OCAML_CONFIG="${BUILD_PREFIX}/lib/ocaml/Makefile.config"
+  if [[ -f "${OCAML_CONFIG}" ]]; then
+    # Replace bare gcc name with full path (use forward slashes for MSYS2 compatibility)
+    sed -i "s|x86_64-w64-mingw32-gcc|${BUILD_PREFIX}/Library/bin/x86_64-w64-mingw32-gcc.exe|g" "${OCAML_CONFIG}"
+    echo "Patched OCaml Makefile.config with full gcc path:"
+    grep "CC" "${OCAML_CONFIG}" | head -5
+  else
+    echo "WARNING: ${OCAML_CONFIG} not found"
+    ls -la "${BUILD_PREFIX}/lib/" 2>/dev/null || true
+  fi
 fi
 
 # ==============================================================================
