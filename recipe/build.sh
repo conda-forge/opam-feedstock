@@ -84,6 +84,10 @@ if [[ "${target_platform}" != "linux-"* ]] && [[ "${target_platform}" != "osx-"*
   # Add mingw-w64 bin directory to PATH for gcc discovery
   export PATH="$BUILD_PREFIX/Library/mingw-w64/bin:$BUILD_PREFIX/Library/bin:$PATH"
 
+  # DEBUG: Check what OCaml thinks the C compiler is
+  echo "DEBUG: ocamlc -config relevant fields:"
+  ocamlc -config | grep -E '(native_c_compiler|bytecomp_c_compiler|native_c_libraries|bytecomp_c_libraries)'
+
   # Resolve actual compiler paths and create dune-workspace
   # Dune's foreign_stubs mechanism discovers C compiler through ocamlc -config, NOT CC env var
   # We must provide actual resolved paths in dune-workspace for Dune to find them
