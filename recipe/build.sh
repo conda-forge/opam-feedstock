@@ -90,15 +90,14 @@ if [[ "${target_platform}" != "linux-"* ]] && [[ "${target_platform}" != "osx-"*
   GCC_PATH="$(which x86_64-w64-mingw32-gcc.exe | sed 's|\\|/|g')"
   GXX_PATH="$(which x86_64-w64-mingw32-g++.exe | sed 's|\\|/|g')"
 
-  # Create dune-workspace with resolved paths (bash expands variables before writing)
-  # Paths must be quoted for Dune's S-expression parser
+  # Create dune-workspace to set environment variables for C compiler
+  # Dune reads CC/CXX from env section, not toolchain
   cat > dune-workspace <<EOF
 (lang dune 2.0)
 (context
  (default
-  (toolchain
-   (c "$GCC_PATH")
-   (cxx "$GXX_PATH"))))
+  (env
+   (_ (env-vars (CC "$GCC_PATH") (CXX "$GXX_PATH"))))))
 EOF
 
   echo "DEBUG: Created dune-workspace with GCC=$GCC_PATH"
