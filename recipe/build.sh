@@ -24,8 +24,10 @@ else
   if [[ -f "${OCAML_CONFIG}" ]]; then
     # The OCaml package has hardcoded paths from its conda-forge build environment
     # These paths don't exist on the opam build machine, so we need to fix them
+    # Convert BUILD_PREFIX backslashes to forward slashes for sed (Windows paths use backslashes)
+    BUILD_PREFIX_UNIX=$(echo "${BUILD_PREFIX}" | sed 's|\\|/|g')
     # Replace any path ending in x86_64-w64-mingw32-gcc.exe with current BUILD_PREFIX path
-    sed -i "s|[A-Za-z]:[^= ]*x86_64-w64-mingw32-gcc\.exe|${BUILD_PREFIX}/Library/bin/x86_64-w64-mingw32-gcc.exe|g" "${OCAML_CONFIG}"
+    sed -i "s|[A-Za-z]:[^= ]*x86_64-w64-mingw32-gcc\.exe|${BUILD_PREFIX_UNIX}/Library/bin/x86_64-w64-mingw32-gcc.exe|g" "${OCAML_CONFIG}"
     echo "Patched OCaml Makefile.config with full gcc path:"
     grep "CC" "${OCAML_CONFIG}" | head -5
   else
