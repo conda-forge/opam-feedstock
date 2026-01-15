@@ -34,12 +34,9 @@ else
   export OCAMLPARAM="verbose=1,_"
   echo "OCAMLPARAM=${OCAMLPARAM} (ocamlopt will show external commands)"
 
-  # Fix MSYS2 argument passing issue with ar.exe
-  # When ocamlopt calls ar.exe with multiple .o files, MSYS2's automatic path
-  # conversion mangles the arguments, treating "file1.o file2.o file3.o" as ONE filename
-  # Setting MSYS2_ARG_CONV_EXCL=* disables this conversion, allowing proper argument passing
-  export MSYS2_ARG_CONV_EXCL="*"
-  echo "MSYS2_ARG_CONV_EXCL=${MSYS2_ARG_CONV_EXCL} (disable MSYS2 path conversion to fix ar.exe argument passing)"
+  # Note: MSYS2_ARG_CONV_EXCL is NOT needed - Dune properly quotes ar arguments
+  # Previous test failures were due to unquoted variables in our diagnostic script,
+  # not in Dune's actual commands. MSYS2 path conversion should work normally.
 fi
 
 # ==============================================================================
@@ -445,17 +442,17 @@ if ! make; then
       echo "Testing ar with single file: ${FIRST_O}"
       x86_64-w64-mingw32-ar.exe rc /tmp/test_archive.a "${FIRST_O}" 2>&1 && echo "Single file archive: SUCCESS" || echo "Single file archive: FAILED"
 
-      # Try with first 5 files
+      # Try with first 5 files (properly quoted)
       echo ""
       echo "Testing ar with first 5 .o files:"
-      FIVE_O=$(ls "${OBJ_DIR}/"*.o 2>/dev/null | head -5 | tr '\n' ' ')
-      x86_64-w64-mingw32-ar.exe rc /tmp/test_archive5.a ${FIVE_O} 2>&1 && echo "5 file archive: SUCCESS" || echo "5 file archive: FAILED"
+      readarray -t FIVE_O < <(ls "${OBJ_DIR}/"*.o 2>/dev/null | head -5)
+      x86_64-w64-mingw32-ar.exe rc /tmp/test_archive5.a "${FIVE_O[@]}" 2>&1 && echo "5 file archive: SUCCESS" || echo "5 file archive: FAILED"
 
-      # Try with all files
+      # Try with all files (properly quoted)
       echo ""
       echo "Testing ar with all .o files:"
-      ALL_O=$(ls "${OBJ_DIR}/"*.o 2>/dev/null | tr '\n' ' ')
-      x86_64-w64-mingw32-ar.exe rc /tmp/test_archive_all.a ${ALL_O} 2>&1 && echo "All files archive: SUCCESS" || echo "All files archive: FAILED with exit code $?"
+      readarray -t ALL_O < <(ls "${OBJ_DIR}/"*.o 2>/dev/null)
+      x86_64-w64-mingw32-ar.exe rc /tmp/test_archive_all.a "${ALL_O[@]}" 2>&1 && echo "All files archive: SUCCESS" || echo "All files archive: FAILED with exit code $?"
     fi
   fi
 
