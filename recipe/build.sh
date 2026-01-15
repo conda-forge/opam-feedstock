@@ -33,6 +33,13 @@ else
   # Make ocamlopt verbose to see ar/as/ld commands for debugging archive creation
   export OCAMLPARAM="verbose=1,_"
   echo "OCAMLPARAM=${OCAMLPARAM} (ocamlopt will show external commands)"
+
+  # Fix MSYS2 argument passing issue with ar.exe
+  # When ocamlopt calls ar.exe with multiple .o files, MSYS2's automatic path
+  # conversion mangles the arguments, treating "file1.o file2.o file3.o" as ONE filename
+  # Setting MSYS2_ARG_CONV_EXCL=* disables this conversion, allowing proper argument passing
+  export MSYS2_ARG_CONV_EXCL="*"
+  echo "MSYS2_ARG_CONV_EXCL=${MSYS2_ARG_CONV_EXCL} (disable MSYS2 path conversion to fix ar.exe argument passing)"
 fi
 
 # ==============================================================================
