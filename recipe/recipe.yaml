@@ -14,6 +14,9 @@ source:
 
 build:
   number: 0
+  # Windows-only build for debugging Dune C compiler discovery
+  skip:
+    - unix
 
 requirements:
   build:
