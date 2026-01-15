@@ -27,16 +27,31 @@ fi
 
 if [[ "${target_platform}" != "${build_platform:-${target_platform}}" ]]; then
   # Configure first (uses native tools for detection)
-  ./configure --prefix="${OPAM_INSTALL_PREFIX}" --with-vendored-deps || { cat config.log; exit 1; }
+  ./configure \
+    --build="${CONDA_TOOLCHAIN_BUILD}" \
+    --host="${CONDA_TOOLCHAIN_BUILD}" \
+    --target="${CONDA_TOOLCHAIN_HOST}" \
+    --prefix="${OPAM_INSTALL_PREFIX}" \
+    --with-vendored-deps \
+    || { cat config.log; exit 1; }
 
   # Phase 1: Build dune with native compiler
-  make src_ext/dune-local/_boot/dune.exe
-
+  file $BUILD_PREFIX/lib/ocaml/unix/unix.cma
+  ocamlc -config
+  (
+    export CONDA_OCAML_AS="${CONDA_TOOLCHAIN_BUILD}"-as
+    export CONDA_OCAML_AR="${CONDA_TOOLCHAIN_BUILD}"-ar
+    export CONDA_OCAML_CC="${CONDA_TOOLCHAIN_BUILD}"-gcc
+    export CONDA_OCAML_LD="${CONDA_TOOLCHAIN_BUILD}"-ld
+    make src_ext/dune-local/_boot/dune.exe
+  )
+  ocamlc -config | grep target
+  
   # Phase 2: Swap to cross-compilers for the main build
   # Dune discovers compilers by looking for ocamlc/ocamlopt in PATH
   # We swap the base and .opt variants to point to cross-compilers
   pushd "${BUILD_PREFIX}/bin"
-    for tool in ocamlc ocamlopt ocamldep ocamlobjinfo; do
+    for tool in ocamlc ocamldep ocamlopt ocamlobjinfo; do
       if [[ -f "${tool}" ]] || [[ -L "${tool}" ]]; then
         mv "${tool}" "${tool}.build"
         ln -sf "${CONDA_TOOLCHAIN_HOST}-${tool}" "${tool}"
@@ -47,9 +62,6 @@ if [[ "${target_platform}" != "${build_platform:-${target_platform}}" ]]; then
       fi
     done
   popd
-
-  # Set QEMU_LD_PREFIX for running any cross-compiled executables
-  export QEMU_LD_PREFIX="${BUILD_PREFIX}/${CONDA_TOOLCHAIN_HOST}/sysroot"
 else
   ./configure --prefix="${OPAM_INSTALL_PREFIX}" --with-vendored-deps || { cat config.log; exit 1; }
 fi
@@ -61,32 +73,102 @@ fi
 # These fixes are required for any OCaml 5.x on Windows.
 
 if [[ "${target_platform}" != "linux-"* ]] && [[ "${target_platform}" != "osx-"* ]]; then
-  # Remove problematic dune rules that don't apply on Windows/MSYS2
+  # ---------------------------------------------------------------------------
+  # Step 1: Ensure Dune can find the C compiler
+  # ---------------------------------------------------------------------------
+  # Dune reads OCaml's -config to get the C compiler name (e.g., x86_64-w64-mingw32-gcc)
+  # and tries to find it in PATH. We need to ensure this compiler is available.
+
+  EXPECTED_CC=$(ocamlc -config | grep "^c_compiler:" | awk '{print $2}')
+  echo "OCaml expects C compiler: ${EXPECTED_CC}"
+
+  # Add potential mingw locations to PATH
+  export PATH="${BUILD_PREFIX}/Library/mingw-w64/bin:${BUILD_PREFIX}/Library/bin:${BUILD_PREFIX}/bin:${PATH}"
+
+  # Check if expected compiler is available
+  if ! command -v "${EXPECTED_CC}" &>/dev/null; then
+    echo "WARNING: ${EXPECTED_CC} not found in PATH"
+    echo "Current PATH: ${PATH}"
+    echo ""
+    echo "Searching for gcc variants..."
+
+    # Search for any gcc in known locations
+    GCC_FOUND=""
+    for dir in "${BUILD_PREFIX}/Library/mingw-w64/bin" "${BUILD_PREFIX}/Library/bin" "${BUILD_PREFIX}/bin"; do
+      if [[ -d "${dir}" ]]; then
+        echo "  Checking ${dir}:"
+        ls -la "${dir}/"*gcc* 2>/dev/null || echo "    (no gcc found)"
+
+        # Look for the expected compiler or generic gcc
+        for candidate in "${dir}/${EXPECTED_CC}.exe" "${dir}/${EXPECTED_CC}" "${dir}/gcc.exe" "${dir}/gcc"; do
+          if [[ -f "${candidate}" ]]; then
+            GCC_FOUND="${candidate}"
+            echo "  Found: ${GCC_FOUND}"
+            break 2
+          fi
+        done
+      fi
+    done
+
+    if [[ -n "${GCC_FOUND}" ]]; then
+      # Create symlink/wrapper for expected compiler name if we found gcc under different name
+      GCC_DIR=$(dirname "${GCC_FOUND}")
+      GCC_BASE=$(basename "${GCC_FOUND}")
+
+      if [[ "${GCC_BASE}" != "${EXPECTED_CC}"* ]]; then
+        echo "Creating wrapper: ${GCC_DIR}/${EXPECTED_CC}.exe -> ${GCC_FOUND}"
+        # On Windows/MSYS2, copy instead of symlink for compatibility
+        cp "${GCC_FOUND}" "${GCC_DIR}/${EXPECTED_CC}.exe" 2>/dev/null || \
+          ln -sf "${GCC_BASE}" "${GCC_DIR}/${EXPECTED_CC}" 2>/dev/null || \
+          echo "WARNING: Could not create wrapper"
+      fi
+    else
+      echo "ERROR: No gcc found in any expected location"
+      echo "Falling back to removing foreign_stubs approach..."
+
+      # Remove foreign_stubs section - CORRECTED PATTERN
+      # Note: The section starts with "  (foreign_stubs" (2 spaces) and ends with "c-flags.sexp)))"
+      sed -i '/^  (foreign_stubs$/,/c-flags\.sexp)))/d' src/core/dune
+
+      # Since we removed foreign_stubs, Dune won't compile C code
+      # We need to compile it manually and link via c_library_flags
+      # This is complex and may not work for all cases
+      echo "WARNING: Manual C compilation fallback - this may not work!"
+    fi
+  else
+    echo "C compiler ${EXPECTED_CC} found in PATH"
+    which "${EXPECTED_CC}" || true
+  fi
+
+  # ---------------------------------------------------------------------------
+  # Step 2: Remove problematic dune rules for Windows
+  # ---------------------------------------------------------------------------
+  # These rules use features not available on Windows/MSYS2
   sed -i '/^(rule$/,/cc64)))/d' src/core/dune
   sed -i '/^(install$/,/opam-putenv\.exe))/d' src/core/dune
 
-  # Remove foreign_stubs section - Dune can't find compiler on Windows/MSYS2
-  # C stubs are handled manually below with opam_stubs.c workaround
-  sed -i '/^(foreign_stubs$/,/c-libraries\.sexp)))/d' src/core/dune
-
-  # Pre-create generated .ml files that dune has trouble with
+  # ---------------------------------------------------------------------------
+  # Step 3: Pre-create generated .ml files
+  # ---------------------------------------------------------------------------
   echo "let value = \"\"" > src/core/opamCoreConfigDeveloper.ml
   echo "let version = \"${PKG_VERSION}\"" > src/core/opamVersionInfo.ml
   cp src/core/opamStubs.ocaml5.ml src/core/opamStubs.ml
   cp src/core/opamWin32Stubs.win32.ml src/core/opamWin32Stubs.ml
 
-  # Windows system libraries for linking
+  # ---------------------------------------------------------------------------
+  # Step 4: Windows system libraries for linking
+  # ---------------------------------------------------------------------------
   echo '(-ladvapi32 -lgdi32 -luser32 -lshell32 -lole32 -luuid -luserenv)' > src/core/c-libraries.sexp
 
-  # Inline C files that use #include for other C files
+  # ---------------------------------------------------------------------------
+  # Step 5: Create opam_stubs.c by inlining included C files
+  # ---------------------------------------------------------------------------
+  # opamCommonStubs.c uses #include to inline other C files
   pushd src/core > /dev/null
   head -n 73 opamCommonStubs.c > opam_stubs.c
   cat opamInject.c >> opam_stubs.c
   cat opamWindows.c >> opam_stubs.c
   popd > /dev/null
-
-  # Add mingw-w64 bin directory to PATH for gcc discovery
-  export PATH="$BUILD_PREFIX/Library/mingw-w64/bin:$BUILD_PREFIX/Library/bin:$PATH"
 fi
 
 make

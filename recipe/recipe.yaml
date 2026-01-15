@@ -35,6 +35,7 @@ requirements:
       then:
         # OCaml compiler has zstd paths embedded from its build environment.
         # We need zstd in build env so those paths resolve correctly.
+        - file
         - zstd
       else:
         - ${{ m2 }}coreutils
