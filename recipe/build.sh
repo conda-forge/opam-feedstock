@@ -23,7 +23,8 @@ else
   OCAML_CONFIG="${BUILD_PREFIX}/Library/lib/ocaml/Makefile.config"
   if [[ -f "${OCAML_CONFIG}" ]]; then
     # Replace bare gcc name with full path (use forward slashes for MSYS2 compatibility)
-    sed -i "s|x86_64-w64-mingw32-gcc|${BUILD_PREFIX}/Library/bin/x86_64-w64-mingw32-gcc.exe|g" "${OCAML_CONFIG}"
+    # Use assignment context (=gcc) to avoid recursive replacement
+    sed -i "s|=x86_64-w64-mingw32-gcc|=${BUILD_PREFIX}/Library/bin/x86_64-w64-mingw32-gcc.exe|g" "${OCAML_CONFIG}"
     echo "Patched OCaml Makefile.config with full gcc path:"
     grep "CC" "${OCAML_CONFIG}" | head -5
   else
