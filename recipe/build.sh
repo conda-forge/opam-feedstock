@@ -19,7 +19,8 @@ else
 
   # Patch OCaml's Makefile.config to use full path for C compiler
   # Dune reads this config and needs the full path to find gcc on Windows
-  OCAML_CONFIG="${BUILD_PREFIX}/lib/ocaml/Makefile.config"
+  # On Windows conda, the path is Library/lib/ocaml/ (not just lib/ocaml/)
+  OCAML_CONFIG="${BUILD_PREFIX}/Library/lib/ocaml/Makefile.config"
   if [[ -f "${OCAML_CONFIG}" ]]; then
     # Replace bare gcc name with full path (use forward slashes for MSYS2 compatibility)
     sed -i "s|x86_64-w64-mingw32-gcc|${BUILD_PREFIX}/Library/bin/x86_64-w64-mingw32-gcc.exe|g" "${OCAML_CONFIG}"
