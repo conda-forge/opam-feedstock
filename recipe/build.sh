@@ -88,23 +88,12 @@ if [[ "${target_platform}" != "linux-"* ]] && [[ "${target_platform}" != "osx-"*
   echo "DEBUG: ocamlc -config relevant fields:"
   ocamlc -config | grep -E '(native_c_compiler|bytecomp_c_compiler|native_c_libraries|bytecomp_c_libraries)'
 
-  # Resolve actual compiler paths and create dune-workspace
-  # Dune's foreign_stubs mechanism discovers C compiler through ocamlc -config, NOT CC env var
-  # We must provide actual resolved paths in dune-workspace for Dune to find them
-  GCC_PATH="$(which x86_64-w64-mingw32-gcc.exe | sed 's|\\|/|g')"
-  GXX_PATH="$(which x86_64-w64-mingw32-g++.exe | sed 's|\\|/|g')"
+  # Verify compiler is findable
+  echo "DEBUG: which x86_64-w64-mingw32-gcc.exe:"
+  which x86_64-w64-mingw32-gcc.exe || echo "NOT FOUND IN PATH"
 
-  # Create dune-workspace to set environment variables for C compiler
-  # Dune reads CC/CXX from env section, not toolchain
-  cat > dune-workspace <<EOF
-(lang dune 2.0)
-(context
- (default
-  (env
-   (_ (env-vars (CC "$GCC_PATH") (CXX "$GXX_PATH"))))))
-EOF
-
-  echo "DEBUG: Created dune-workspace with GCC=$GCC_PATH"
+  echo "DEBUG: Testing if gcc works:"
+  x86_64-w64-mingw32-gcc.exe --version 2>&1 | head -1 || echo "EXECUTION FAILED"
 fi
 
 make
