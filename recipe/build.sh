@@ -43,34 +43,20 @@ else
   # not in Dune's actual commands. MSYS2 path conversion should work normally.
 
   # ---------------------------------------------------------------------------
-  # Create ar.exe wrapper to disable MSYS2 path conversion
+  # Disable MSYS2 path conversion globally for ar.exe argument handling
   # ---------------------------------------------------------------------------
   # Problem: MSYS2 automatic path conversion mangles ar.exe arguments
   # When ocamlopt calls: ar.exe rc "archive.a" "file1.o" "file2.o" "file3.o"
   # MSYS2 converts multiple .o arguments into ONE concatenated path
-  # Solution: Wrapper that disables path conversion ONLY for ar.exe
+  # Solution: Set MSYS2_ARG_CONV_EXCL=* to disable all path conversion
   #
-  # CRITICAL: Must be created BEFORE ./configure so Dune's tool discovery finds wrapper
-  AR_WRAPPER_DIR="${SRC_DIR}/.ar_wrapper"
-  mkdir -p "${AR_WRAPPER_DIR}"
+  # This is safe because:
+  # 1. Dune generates Windows-native paths (C:\...) already
+  # 2. ar.exe expects Windows paths, not MSYS2 Unix-style paths
+  # 3. Only affects this build process, not system-wide
+  export MSYS2_ARG_CONV_EXCL="*"
 
-  # Copy ar.exe from build environment to wrapper directory
-  cp "${BUILD_PREFIX}/Library/bin/x86_64-w64-mingw32-ar.exe" "${AR_WRAPPER_DIR}/.real_ar.exe"
-
-  # Create Windows batch file wrapper (not bash script - .exe cannot be bash on Windows)
-  # Batch files can set environment variables and call executables
-  cat > "${AR_WRAPPER_DIR}/x86_64-w64-mingw32-ar.bat" << 'EOF_AR_WRAPPER'
-@echo off
-set MSYS2_ARG_CONV_EXCL=*
-"%~dp0.real_ar.exe" %*
-EOF_AR_WRAPPER
-
-  # Prepend wrapper directory to PATH so configure/Dune finds our wrapper first
-  export PATH="${AR_WRAPPER_DIR}:${PATH}"
-
-  echo "Created ar wrapper at ${AR_WRAPPER_DIR}/x86_64-w64-mingw32-ar.bat"
-  echo "Real ar.exe at ${AR_WRAPPER_DIR}/.real_ar.exe"
-  echo "Wrapper batch file disables MSYS2_ARG_CONV_EXCL for ar invocations only"
+  echo "Set MSYS2_ARG_CONV_EXCL=* to prevent ar.exe argument mangling"
 fi
 
 # ==============================================================================
