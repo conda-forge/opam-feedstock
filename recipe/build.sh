@@ -182,7 +182,7 @@ fi
 
 if [[ "${target_platform}" != "linux-"* ]] && [[ "${target_platform}" != "osx-"* ]]; then
   # Windows: Use verbose display to see Dune's internal errors
-  make DUNE_OPTS="--display=verbose"
+  make DUNE_ARGS="--display=verbose"
 else
   make
 fi
