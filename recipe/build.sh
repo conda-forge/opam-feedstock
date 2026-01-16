@@ -207,38 +207,43 @@ if [[ "${target_platform}" != "linux-"* ]] && [[ "${target_platform}" != "osx-"*
   echo "C compiler verified in PATH: $(command -v "${CONDA_TOOLCHAIN_HOST}-gcc.exe")"
 
   # ---------------------------------------------------------------------------
-  # Use llvm-ar instead of mingw-ar for better Windows compatibility
+  # Use gcc-ar instead of plain ar for better LTO and large archive handling
   # ---------------------------------------------------------------------------
-  # Problem: x86_64-w64-mingw32-ar.exe fails silently on large archives
-  # Solution: llvm-ar handles many .o files better on Windows
+  # Problem: x86_64-w64-mingw32-ar.exe fails silently on large archives (23+ .o)
+  # Solution: gcc-ar is a wrapper around ar with plugin support, may handle this better
   #
-  # Create llvm-ar wrapper as x86_64-w64-mingw32-ar.exe
+  # Try gcc-ar first, then llvm-ar, fallback to default ar
   MINGW_AR_PATH=$(command -v "${CONDA_TOOLCHAIN_HOST}-ar.exe")
   if [[ -n "$MINGW_AR_PATH" ]]; then
-    MINGW_AR_DIR=$(dirname "$MINGW_AR_PATH")
-    # Find llvm-ar in conda environment
-    LLVM_AR=$(find "${BUILD_PREFIX}/Library" "${PREFIX}/Library" -name "llvm-ar.exe" -type f 2>/dev/null | head -1)
+    # Try gcc-ar (part of GCC toolchain, should be available)
+    GCC_AR=$(command -v "${CONDA_TOOLCHAIN_HOST}-gcc-ar.exe" 2>/dev/null)
 
-    if [[ -n "$LLVM_AR" ]] && [[ -f "$LLVM_AR" ]]; then
-      echo "Found llvm-ar at: $LLVM_AR"
+    if [[ -n "$GCC_AR" ]] && [[ -f "$GCC_AR" ]]; then
+      echo "Found gcc-ar at: $GCC_AR"
 
-      # Rename original mingw-ar
+      # Rename original ar
       mv "$MINGW_AR_PATH" "${MINGW_AR_PATH}.orig"
 
-      # Create batch wrapper that calls llvm-ar
-      cat > "$MINGW_AR_PATH" << 'AR_WRAPPER_EOF'
-@echo off
-REM llvm-ar wrapper for x86_64-w64-mingw32-ar.exe
-"%LLVM_AR_FULL%" %*
-AR_WRAPPER_EOF
+      # Symlink gcc-ar as ar
+      ln -s "$GCC_AR" "$MINGW_AR_PATH"
 
-      # Inject actual llvm-ar path into wrapper
-      sed -i "s|%LLVM_AR_FULL%|${LLVM_AR}|g" "$MINGW_AR_PATH"
-      chmod +x "$MINGW_AR_PATH"
-
-      echo "Replaced ${CONDA_TOOLCHAIN_HOST}-ar.exe with llvm-ar wrapper"
+      echo "Replaced ${CONDA_TOOLCHAIN_HOST}-ar.exe with gcc-ar"
     else
-      echo "WARNING: llvm-ar.exe not found, using default mingw-ar"
+      # Try llvm-ar as fallback
+      LLVM_AR=$(find "${BUILD_PREFIX}/Library" "${PREFIX}/Library" -name "llvm-ar.exe" -type f 2>/dev/null | head -1)
+
+      if [[ -n "$LLVM_AR" ]] && [[ -f "$LLVM_AR" ]]; then
+        echo "Found llvm-ar at: $LLVM_AR (gcc-ar not available)"
+
+        mv "$MINGW_AR_PATH" "${MINGW_AR_PATH}.orig"
+        ln -s "$LLVM_AR" "$MINGW_AR_PATH"
+
+        echo "Replaced ${CONDA_TOOLCHAIN_HOST}-ar.exe with llvm-ar"
+      else
+        echo "WARNING: Neither gcc-ar nor llvm-ar found, using default ar.exe"
+        echo "This may fail on large archives. Listing available ar tools:"
+        find "${BUILD_PREFIX}/Library" -name "*ar*.exe" -type f 2>/dev/null | head -10
+      fi
     fi
   fi
 fi
