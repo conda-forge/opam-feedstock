@@ -114,6 +114,36 @@ if [[ "${target_platform}" != "linux-"* ]] && [[ "${target_platform}" != "osx-"*
   fi
 
   # ---------------------------------------------------------------------------
+  # Create ar.exe wrapper to disable MSYS2 path conversion
+  # ---------------------------------------------------------------------------
+  # Problem: MSYS2 automatic path conversion mangles ar.exe arguments
+  # When ocamlopt calls: ar.exe rc "archive.a" "file1.o" "file2.o" "file3.o"
+  # MSYS2 converts multiple .o arguments into ONE concatenated path
+  # Solution: Wrapper that disables path conversion ONLY for ar.exe
+  #
+  # We must preserve the original ar.exe and create wrapper in front of it in PATH
+  REAL_AR=$(which x86_64-w64-mingw32-ar.exe)
+  AR_WRAPPER_DIR="${SRC_DIR}/.ar_wrapper"
+  mkdir -p "${AR_WRAPPER_DIR}"
+
+  cat > "${AR_WRAPPER_DIR}/x86_64-w64-mingw32-ar.exe" << 'EOF_AR_WRAPPER'
+#!/usr/bin/env bash
+# Disable MSYS2 path conversion for ar.exe to prevent argument mangling
+export MSYS2_ARG_CONV_EXCL="*"
+exec "$(dirname "$0")/.real_ar.exe" "$@"
+EOF_AR_WRAPPER
+
+  chmod +x "${AR_WRAPPER_DIR}/x86_64-w64-mingw32-ar.exe"
+  cp "${REAL_AR}" "${AR_WRAPPER_DIR}/.real_ar.exe"
+
+  # Prepend wrapper directory to PATH so ocamlopt finds our wrapper first
+  export PATH="${AR_WRAPPER_DIR}:${PATH}"
+
+  echo "Created ar.exe wrapper at ${AR_WRAPPER_DIR}/x86_64-w64-mingw32-ar.exe"
+  echo "Real ar.exe at ${AR_WRAPPER_DIR}/.real_ar.exe"
+  echo "Wrapper disables MSYS2_ARG_CONV_EXCL for ar invocations only"
+
+  # ---------------------------------------------------------------------------
   # Remove problematic dune rules for Windows
   # ---------------------------------------------------------------------------
   # These rules use features not available on Windows/MSYS2
