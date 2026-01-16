@@ -57,22 +57,20 @@ else
   # Copy ar.exe from build environment to wrapper directory
   cp "${BUILD_PREFIX}/Library/bin/x86_64-w64-mingw32-ar.exe" "${AR_WRAPPER_DIR}/.real_ar.exe"
 
-  # Create wrapper script with embedded absolute path to real ar.exe
-  cat > "${AR_WRAPPER_DIR}/x86_64-w64-mingw32-ar.exe" << 'EOF_AR_WRAPPER'
-#!/usr/bin/env bash
-# Disable MSYS2 path conversion for ar.exe to prevent argument mangling
-export MSYS2_ARG_CONV_EXCL="*"
-exec "$(dirname "$0")/.real_ar.exe" "$@"
+  # Create Windows batch file wrapper (not bash script - .exe cannot be bash on Windows)
+  # Batch files can set environment variables and call executables
+  cat > "${AR_WRAPPER_DIR}/x86_64-w64-mingw32-ar.bat" << 'EOF_AR_WRAPPER'
+@echo off
+set MSYS2_ARG_CONV_EXCL=*
+"%~dp0.real_ar.exe" %*
 EOF_AR_WRAPPER
-
-  chmod +x "${AR_WRAPPER_DIR}/x86_64-w64-mingw32-ar.exe"
 
   # Prepend wrapper directory to PATH so configure/Dune finds our wrapper first
   export PATH="${AR_WRAPPER_DIR}:${PATH}"
 
-  echo "Created ar.exe wrapper at ${AR_WRAPPER_DIR}/x86_64-w64-mingw32-ar.exe"
+  echo "Created ar wrapper at ${AR_WRAPPER_DIR}/x86_64-w64-mingw32-ar.bat"
   echo "Real ar.exe at ${AR_WRAPPER_DIR}/.real_ar.exe"
-  echo "Wrapper disables MSYS2_ARG_CONV_EXCL for ar invocations only"
+  echo "Wrapper batch file disables MSYS2_ARG_CONV_EXCL for ar invocations only"
 fi
 
 # ==============================================================================
