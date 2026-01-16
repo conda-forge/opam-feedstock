@@ -221,13 +221,11 @@ if [[ "${target_platform}" != "linux-"* ]] && [[ "${target_platform}" != "osx-"*
     if [[ -n "$GCC_AR" ]] && [[ -f "$GCC_AR" ]]; then
       echo "Found gcc-ar at: $GCC_AR"
 
-      # Rename original ar
+      # Rename original ar and COPY gcc-ar (symlinks don't work on Windows)
       mv "$MINGW_AR_PATH" "${MINGW_AR_PATH}.orig"
+      cp "$GCC_AR" "$MINGW_AR_PATH"
 
-      # Symlink gcc-ar as ar
-      ln -s "$GCC_AR" "$MINGW_AR_PATH"
-
-      echo "Replaced ${CONDA_TOOLCHAIN_HOST}-ar.exe with gcc-ar"
+      echo "Replaced ${CONDA_TOOLCHAIN_HOST}-ar.exe with gcc-ar (copy)"
     else
       # Try llvm-ar as fallback
       LLVM_AR=$(find "${BUILD_PREFIX}/Library" "${PREFIX}/Library" -name "llvm-ar.exe" -type f 2>/dev/null | head -1)
@@ -236,9 +234,9 @@ if [[ "${target_platform}" != "linux-"* ]] && [[ "${target_platform}" != "osx-"*
         echo "Found llvm-ar at: $LLVM_AR (gcc-ar not available)"
 
         mv "$MINGW_AR_PATH" "${MINGW_AR_PATH}.orig"
-        ln -s "$LLVM_AR" "$MINGW_AR_PATH"
+        cp "$LLVM_AR" "$MINGW_AR_PATH"
 
-        echo "Replaced ${CONDA_TOOLCHAIN_HOST}-ar.exe with llvm-ar"
+        echo "Replaced ${CONDA_TOOLCHAIN_HOST}-ar.exe with llvm-ar (copy)"
       else
         echo "WARNING: Neither gcc-ar nor llvm-ar found, using default ar.exe"
         echo "This may fail on large archives. Listing available ar tools:"
