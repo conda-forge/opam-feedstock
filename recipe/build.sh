@@ -181,7 +181,11 @@ if [[ "${target_platform}" != "linux-"* ]] && [[ "${target_platform}" != "osx-"*
 fi
 
 if [[ "${target_platform}" != "linux-"* ]] && [[ "${target_platform}" != "osx-"* ]]; then
-  # Windows: Use verbose display to see Dune's internal errors
+  # Windows: Export CC so Dune can find the cross-toolchain C compiler
+  # Dune looks for the C compiler in PATH but needs to know the exact name
+  export CC="${CONDA_TOOLCHAIN_HOST}-gcc"
+
+  # Use verbose display to see Dune's internal errors
   make DUNE_ARGS="--display=verbose"
 else
   make
