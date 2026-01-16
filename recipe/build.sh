@@ -205,6 +205,46 @@ if [[ "${target_platform}" != "linux-"* ]] && [[ "${target_platform}" != "osx-"*
     exit 1
   fi
   echo "C compiler verified in PATH: $(command -v "${CONDA_TOOLCHAIN_HOST}-gcc.exe")"
+
+  # ---------------------------------------------------------------------------
+  # Create ar.exe wrapper to diagnose silent failures
+  # ---------------------------------------------------------------------------
+  # ar.exe is failing silently when creating opam_client.a
+  # This wrapper will capture stderr, verify file existence, and log details
+  mkdir -p "${SRC_DIR}/wrapper_bin"
+  cat > "${SRC_DIR}/wrapper_bin/x86_64-w64-mingw32-ar.exe" << 'WRAPPER_EOF'
+#!/usr/bin/env bash
+# ar.exe diagnostic wrapper
+REAL_AR="${BUILD_PREFIX}/Library/bin/x86_64-w64-mingw32-ar.exe"
+echo "[ar-wrapper] Called with $# arguments" >&2
+echo "[ar-wrapper] Args: $*" >&2
+
+# Check if all input .o files exist
+for arg in "$@"; do
+  if [[ "$arg" == *.o ]]; then
+    if [[ ! -f "$arg" ]]; then
+      echo "[ar-wrapper] ERROR: Missing input file: $arg" >&2
+      exit 1
+    fi
+  fi
+done
+
+# Call real ar and capture output
+echo "[ar-wrapper] Calling: $REAL_AR $*" >&2
+"$REAL_AR" "$@" 2>&1 | tee /tmp/ar-stderr.log
+exit_code=${PIPESTATUS[0]}
+
+if [[ $exit_code -ne 0 ]]; then
+  echo "[ar-wrapper] ERROR: ar.exe exited with code $exit_code" >&2
+  echo "[ar-wrapper] stderr content:" >&2
+  cat /tmp/ar-stderr.log >&2
+fi
+
+exit $exit_code
+WRAPPER_EOF
+  chmod +x "${SRC_DIR}/wrapper_bin/x86_64-w64-mingw32-ar.exe"
+  export PATH="${SRC_DIR}/wrapper_bin:${PATH}"
+  echo "ar.exe wrapper installed in PATH for diagnostics"
 fi
 
 make
