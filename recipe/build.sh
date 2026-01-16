@@ -38,6 +38,11 @@ else
   export DUNE_CONFIG__DISPLAY=verbose
   echo "DUNE_CONFIG__DISPLAY=verbose (Dune will show detailed build plan and errors)"
 
+  # Clear Dune cache to force fresh compiler discovery
+  # Dune may cache compiler paths from previous runs, causing stale lookups
+  rm -rf _build .dune 2>/dev/null || true
+  echo "Cleared Dune cache directories to force fresh compiler discovery"
+
   # Note: MSYS2_ARG_CONV_EXCL is NOT needed - Dune properly quotes ar arguments
   # Previous test failures were due to unquoted variables in our diagnostic script,
   # not in Dune's actual commands. MSYS2 path conversion should work normally.
@@ -59,27 +64,27 @@ else
   echo "Set MSYS2_ARG_CONV_EXCL=* to prevent ar.exe argument mangling"
 
   # ---------------------------------------------------------------------------
-  # Create wrapper batch files for unprefixed compiler tool names
+  # Ensure prefixed compiler binaries are in PATH for Dune
   # ---------------------------------------------------------------------------
-  # Problem: OCaml config reports "c_compiler: gcc" but actual tool is x86_64-w64-mingw32-gcc.exe
-  # Dune's compiler discovery looks for "gcc.exe" based on OCaml config, can't find prefixed version
-  # Solution: Create gcc.bat wrapper that calls the prefixed version
-  # Note: Using .bat (not symlinks) because symlinks are unreliable on Windows
+  # Issue: Dune's Bin.which searches for executables but may not find them
+  # if they're in non-standard locations. The conda-forge Windows compiler
+  # is at BUILD_PREFIX/Library/mingw-w64/bin/x86_64-w64-mingw32-gcc.exe
+  #
+  # Dune expects to find the compiler reported by `ocamlc -config` which is
+  # "x86_64-w64-mingw32-gcc" (Dune adds .exe automatically on Windows).
+  #
+  # Solution: Verify PATH includes the directory with gcc, don't create wrappers
+  # (wrappers break because gcc needs its full toolchain: cc1, as, ld, etc.)
 
-  WRAPPER_DIR="${BUILD_PREFIX}/Library/bin"
-
-  cat > "${WRAPPER_DIR}/gcc.bat" << 'EOFGCC'
-@echo off
-x86_64-w64-mingw32-gcc.exe %*
-EOFGCC
-
-  cat > "${WRAPPER_DIR}/g++.bat" << 'EOFGXX'
-@echo off
-x86_64-w64-mingw32-g++.exe %*
-EOFGXX
-
-  chmod +x "${WRAPPER_DIR}/gcc.bat" "${WRAPPER_DIR}/g++.bat"
-  echo "Created gcc.bat and g++.bat wrappers in ${WRAPPER_DIR}"
+  echo "Verifying MinGW gcc is findable..."
+  if command -v x86_64-w64-mingw32-gcc.exe &>/dev/null; then
+    GCC_PATH=$(command -v x86_64-w64-mingw32-gcc.exe)
+    echo "Found: ${GCC_PATH}"
+  else
+    echo "ERROR: x86_64-w64-mingw32-gcc.exe not in PATH"
+    echo "PATH=${PATH}"
+    exit 1
+  fi
 fi
 
 # ==============================================================================
@@ -188,10 +193,20 @@ if [[ "${target_platform}" != "linux-"* ]] && [[ "${target_platform}" != "osx-"*
 fi
 
 if [[ "${target_platform}" != "linux-"* ]] && [[ "${target_platform}" != "osx-"* ]]; then
-  # Windows: Export CC so Dune can find the cross-toolchain C compiler
-  # Dune looks for the C compiler in PATH but needs to know the exact name
-  # On Windows, executables require .exe extension
-  export CC="${CONDA_TOOLCHAIN_HOST}-gcc.exe"
+  # Windows: Export CC with FULL PATH so Dune can find the compiler
+  # Dune's Bin.which may not search all PATH directories properly on Windows
+  # Use full path to ensure reliable discovery
+  CC_BASENAME="${CONDA_TOOLCHAIN_HOST}-gcc.exe"
+  CC_FULLPATH=$(command -v "${CC_BASENAME}" || echo "")
+
+  if [[ -z "${CC_FULLPATH}" ]]; then
+    echo "ERROR: Cannot find ${CC_BASENAME} in PATH"
+    echo "PATH=${PATH}"
+    exit 1
+  fi
+
+  export CC="${CC_FULLPATH}"
+  echo "Set CC=${CC} for Dune compiler discovery"
 
   # Use verbose display to see Dune's internal errors
   make DUNE_ARGS="--display=verbose"
