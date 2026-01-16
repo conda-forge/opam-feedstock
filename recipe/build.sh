@@ -193,20 +193,34 @@ if [[ "${target_platform}" != "linux-"* ]] && [[ "${target_platform}" != "osx-"*
 fi
 
 if [[ "${target_platform}" != "linux-"* ]] && [[ "${target_platform}" != "osx-"* ]]; then
-  # Windows: Export CC with FULL PATH so Dune can find the compiler
-  # Dune's Bin.which may not search all PATH directories properly on Windows
-  # Use full path to ensure reliable discovery
-  CC_BASENAME="${CONDA_TOOLCHAIN_HOST}-gcc.exe"
-  CC_FULLPATH=$(command -v "${CC_BASENAME}" || echo "")
+  # Windows: Dune's Bin.which searches for EXACT compiler name from ocamlc -config
+  # It looks for x86_64-w64-mingw32-gcc.exe in PATH but may not find it due to
+  # search path ordering or Dune's internal caching
+  #
+  # Solution: Force Dune to use ocamlc -config output by ensuring compiler is findable
+  # AND bypass Dune's caching by clearing any cached compiler discovery
 
-  if [[ -z "${CC_FULLPATH}" ]]; then
-    echo "ERROR: Cannot find ${CC_BASENAME} in PATH"
+  echo "OCaml compiler native_c_compiler setting:"
+  "${BUILD_PREFIX}/Library/bin/ocamlc.opt.exe" -config | grep "native_c_compiler"
+
+  # Clear Dune cache to force fresh compiler discovery
+  rm -rf _build .dune 2>/dev/null || true
+  echo "Cleared Dune cache to force fresh compiler discovery"
+
+  # Set OCAML_CC to override Dune's compiler discovery
+  # This is more reliable than CC alone for Dune
+  export OCAML_CC="${CONDA_TOOLCHAIN_HOST}-gcc.exe"
+  export CC="${CONDA_TOOLCHAIN_HOST}-gcc.exe"
+  echo "Set OCAML_CC=${OCAML_CC} and CC=${CC}"
+
+  # Verify compiler is in PATH
+  if ! command -v "${CONDA_TOOLCHAIN_HOST}-gcc.exe" >/dev/null 2>&1; then
+    echo "ERROR: ${CONDA_TOOLCHAIN_HOST}-gcc.exe not found in PATH"
     echo "PATH=${PATH}"
     exit 1
   fi
 
-  export CC="${CC_FULLPATH}"
-  echo "Set CC=${CC} for Dune compiler discovery"
+  echo "C compiler verified in PATH: $(command -v "${CONDA_TOOLCHAIN_HOST}-gcc.exe")"
 
   # Use verbose display to see Dune's internal errors
   make DUNE_ARGS="--display=verbose"
