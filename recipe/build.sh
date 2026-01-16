@@ -250,8 +250,12 @@ if [[ "${target_platform}" != "linux-"* ]] && [[ "${target_platform}" != "osx-"*
   fi
 fi
 
-# Run make with failure diagnostics
-if ! make; then
+# Run make with sequential jobs to reveal errors hidden by parallel execution
+# Also pass DUNE_ARGS for verbose and sequential execution
+export DUNE_CONFIG__JOBS=1
+echo "Set DUNE_CONFIG__JOBS=1 to force sequential build (reveals hidden errors)"
+
+if ! make DUNE_ARGS="--display=verbose -j 1"; then
   echo "=== BUILD FAILED - Diagnostics ==="
   echo "Checking key build artifacts:"
   echo "--- opam_client.a ---"
