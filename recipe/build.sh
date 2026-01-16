@@ -211,43 +211,28 @@ if [[ "${target_platform}" != "linux-"* ]] && [[ "${target_platform}" != "osx-"*
   echo "C compiler verified in PATH: $(command -v "${CONDA_TOOLCHAIN_HOST}-gcc.exe")"
 
   # ---------------------------------------------------------------------------
-  # Use gcc-ar instead of plain ar for better LTO and large archive handling
+  # ar.exe debugging: keep original ar, add wrapper to capture exit codes
   # ---------------------------------------------------------------------------
-  # Problem: x86_64-w64-mingw32-ar.exe fails silently on large archives (23+ .o)
-  # Solution: gcc-ar is a wrapper around ar with plugin support, may handle this better
+  # Previous attempts:
+  # - gcc-ar replacement: Failed - gcc-ar when copied returns non-zero exit codes
+  #   even when archive is created (plugin path issues)
+  # - llvm-ar replacement: Failed - llvm-ar not available in conda environment
   #
-  # Try gcc-ar first, then llvm-ar, fallback to default ar
+  # Current approach: Use original ar.exe but wrap it to capture diagnostics
   MINGW_AR_PATH=$(command -v "${CONDA_TOOLCHAIN_HOST}-ar.exe")
-  if [[ -n "$MINGW_AR_PATH" ]]; then
-    # Try gcc-ar (part of GCC toolchain, should be available)
-    GCC_AR=$(command -v "${CONDA_TOOLCHAIN_HOST}-gcc-ar.exe" 2>/dev/null)
+  echo "Using original ar.exe at: ${MINGW_AR_PATH}"
+  echo "ar.exe version:"
+  "${MINGW_AR_PATH}" --version 2>&1 || true
 
-    if [[ -n "$GCC_AR" ]] && [[ -f "$GCC_AR" ]]; then
-      echo "Found gcc-ar at: $GCC_AR"
-
-      # Rename original ar and COPY gcc-ar (symlinks don't work on Windows)
-      mv "$MINGW_AR_PATH" "${MINGW_AR_PATH}.orig"
-      cp "$GCC_AR" "$MINGW_AR_PATH"
-
-      echo "Replaced ${CONDA_TOOLCHAIN_HOST}-ar.exe with gcc-ar (copy)"
-    else
-      # Try llvm-ar as fallback
-      LLVM_AR=$(find "${BUILD_PREFIX}/Library" "${PREFIX}/Library" -name "llvm-ar.exe" -type f 2>/dev/null | head -1)
-
-      if [[ -n "$LLVM_AR" ]] && [[ -f "$LLVM_AR" ]]; then
-        echo "Found llvm-ar at: $LLVM_AR (gcc-ar not available)"
-
-        mv "$MINGW_AR_PATH" "${MINGW_AR_PATH}.orig"
-        cp "$LLVM_AR" "$MINGW_AR_PATH"
-
-        echo "Replaced ${CONDA_TOOLCHAIN_HOST}-ar.exe with llvm-ar (copy)"
-      else
-        echo "WARNING: Neither gcc-ar nor llvm-ar found, using default ar.exe"
-        echo "This may fail on large archives. Listing available ar tools:"
-        find "${BUILD_PREFIX}/Library" -name "*ar*.exe" -type f 2>/dev/null | head -10
-      fi
-    fi
-  fi
+  # Test ar.exe with a simple archive to verify it works
+  echo "Testing ar.exe basic functionality:"
+  echo "int main() { return 0; }" > /tmp/test_ar.c
+  "${CONDA_TOOLCHAIN_HOST}-gcc.exe" -c /tmp/test_ar.c -o /tmp/test_ar.o 2>&1 || true
+  "${MINGW_AR_PATH}" rc /tmp/test_ar.a /tmp/test_ar.o 2>&1
+  AR_EXIT=$?
+  echo "ar.exe test exit code: ${AR_EXIT}"
+  ls -la /tmp/test_ar.a 2>&1 || echo "test archive NOT created"
+  rm -f /tmp/test_ar.c /tmp/test_ar.o /tmp/test_ar.a 2>/dev/null || true
 fi
 
 # Run make with sequential jobs to reveal errors hidden by parallel execution
@@ -257,19 +242,35 @@ echo "Set DUNE_CONFIG__JOBS=1 to force sequential build (reveals hidden errors)"
 
 if ! make DUNE_ARGS="--display=verbose -j 1"; then
   echo "=== BUILD FAILED - Diagnostics ==="
-  echo "Checking key build artifacts:"
-  echo "--- opam_client.a ---"
-  ls -la _build/default/src/client/opam_client.a 2>&1 || echo "opam_client.a NOT FOUND"
-  echo "--- opam_client.cmxa ---"
-  ls -la _build/default/src/client/opam_client.cmxa 2>&1 || echo "opam_client.cmxa NOT FOUND"
-  echo "--- OpamMain.o ---"
-  ls -la _build/default/src/client/.opamMain.eobjs/native/dune__exe__OpamMain.o 2>&1 || echo "OpamMain.o NOT FOUND"
-  echo "--- OpamMain.cmx ---"
-  ls -la _build/default/src/client/.opamMain.eobjs/native/dune__exe__OpamMain.cmx 2>&1 || echo "OpamMain.cmx NOT FOUND"
-  echo "--- opam.exe (final binary) ---"
-  ls -la _build/default/src/client/opam.exe 2>&1 || echo "opam.exe NOT FOUND (expected - linking never started)"
-  echo "--- Dune log for errors ---"
-  cat _build/log 2>&1 | tail -50 || echo "No Dune log found"
+
+  echo "--- ar.exe in PATH and version ---"
+  command -v "${CONDA_TOOLCHAIN_HOST}-ar.exe" 2>&1 || echo "ar.exe NOT FOUND"
+  "${CONDA_TOOLCHAIN_HOST}-ar.exe" --version 2>&1 || echo "ar --version failed"
+
+  echo "--- Checking key build artifacts ---"
+  echo "opam_client.a:"
+  ls -la _build/default/src/client/opam_client.a 2>&1 || echo "  NOT FOUND"
+  echo "opam_client.cmxa:"
+  ls -la _build/default/src/client/opam_client.cmxa 2>&1 || echo "  NOT FOUND"
+  echo "OpamMain.o:"
+  ls -la _build/default/src/client/.opamMain.eobjs/native/dune__exe__OpamMain.o 2>&1 || echo "  NOT FOUND"
+  echo "OpamMain.cmx:"
+  ls -la _build/default/src/client/.opamMain.eobjs/native/dune__exe__OpamMain.cmx 2>&1 || echo "  NOT FOUND"
+  echo "opam.exe (final binary):"
+  ls -la _build/default/src/client/opam.exe 2>&1 || echo "  NOT FOUND (expected - linking never started)"
+
+  echo "--- All .a archives created ---"
+  find _build/default -name "*.a" -type f 2>/dev/null | head -20
+
+  echo "--- Dune _build/log (last 100 lines) ---"
+  cat _build/log 2>&1 | tail -100 || echo "No Dune log found"
+
+  echo "--- Check if link-opam-manifest was created ---"
+  ls -la _build/default/src/client/link-opam-manifest* 2>&1 || echo "link-opam-manifest NOT FOUND"
+
+  echo "--- Check linking.sexp ---"
+  cat _build/default/src/client/linking.sexp 2>&1 || echo "linking.sexp NOT FOUND"
+
   echo "=== End Diagnostics ==="
   exit 1
 fi
