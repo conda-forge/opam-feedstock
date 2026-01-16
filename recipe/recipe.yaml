@@ -11,6 +11,8 @@ package:
 source:
   - url: https://github.com/ocaml/opam/releases/download/${{ version }}/opam-full-${{ version }}.tar.gz
     sha256: 25fb98f962c4227c1261e142afc68a416778e6e819600bd5ee3ec4a18ae1e238
+    patches:
+      - 0001-fix-dune-which-double-exe-on-windows.patch
 
 build:
   number: 0
