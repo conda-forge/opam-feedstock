@@ -211,28 +211,18 @@ if [[ "${target_platform}" != "linux-"* ]] && [[ "${target_platform}" != "osx-"*
   echo "C compiler verified in PATH: $(command -v "${CONDA_TOOLCHAIN_HOST}-gcc.exe")"
 
   # ---------------------------------------------------------------------------
-  # ar.exe debugging: keep original ar, add wrapper to capture exit codes
+  # ar.exe info (no replacement - using original ar)
   # ---------------------------------------------------------------------------
   # Previous attempts:
   # - gcc-ar replacement: Failed - gcc-ar when copied returns non-zero exit codes
   #   even when archive is created (plugin path issues)
   # - llvm-ar replacement: Failed - llvm-ar not available in conda environment
   #
-  # Current approach: Use original ar.exe but wrap it to capture diagnostics
+  # Current approach: Use original ar.exe and let the build proceed
   MINGW_AR_PATH=$(command -v "${CONDA_TOOLCHAIN_HOST}-ar.exe")
   echo "Using original ar.exe at: ${MINGW_AR_PATH}"
   echo "ar.exe version:"
   "${MINGW_AR_PATH}" --version 2>&1 || true
-
-  # Test ar.exe with a simple archive to verify it works
-  echo "Testing ar.exe basic functionality:"
-  echo "int main() { return 0; }" > /tmp/test_ar.c
-  "${CONDA_TOOLCHAIN_HOST}-gcc.exe" -c /tmp/test_ar.c -o /tmp/test_ar.o 2>&1 || true
-  "${MINGW_AR_PATH}" rc /tmp/test_ar.a /tmp/test_ar.o 2>&1
-  AR_EXIT=$?
-  echo "ar.exe test exit code: ${AR_EXIT}"
-  ls -la /tmp/test_ar.a 2>&1 || echo "test archive NOT created"
-  rm -f /tmp/test_ar.c /tmp/test_ar.o /tmp/test_ar.a 2>/dev/null || true
 fi
 
 # Run make with sequential jobs to reveal errors hidden by parallel execution
