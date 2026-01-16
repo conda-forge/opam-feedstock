@@ -37,6 +37,38 @@ else
   # Note: MSYS2_ARG_CONV_EXCL is NOT needed - Dune properly quotes ar arguments
   # Previous test failures were due to unquoted variables in our diagnostic script,
   # not in Dune's actual commands. MSYS2 path conversion should work normally.
+
+  # ---------------------------------------------------------------------------
+  # Create ar.exe wrapper to disable MSYS2 path conversion
+  # ---------------------------------------------------------------------------
+  # Problem: MSYS2 automatic path conversion mangles ar.exe arguments
+  # When ocamlopt calls: ar.exe rc "archive.a" "file1.o" "file2.o" "file3.o"
+  # MSYS2 converts multiple .o arguments into ONE concatenated path
+  # Solution: Wrapper that disables path conversion ONLY for ar.exe
+  #
+  # CRITICAL: Must be created BEFORE ./configure so Dune's tool discovery finds wrapper
+  AR_WRAPPER_DIR="${SRC_DIR}/.ar_wrapper"
+  mkdir -p "${AR_WRAPPER_DIR}"
+
+  # Copy ar.exe from build environment to wrapper directory
+  cp "${BUILD_PREFIX}/Library/bin/x86_64-w64-mingw32-ar.exe" "${AR_WRAPPER_DIR}/.real_ar.exe"
+
+  # Create wrapper script with embedded absolute path to real ar.exe
+  cat > "${AR_WRAPPER_DIR}/x86_64-w64-mingw32-ar.exe" << 'EOF_AR_WRAPPER'
+#!/usr/bin/env bash
+# Disable MSYS2 path conversion for ar.exe to prevent argument mangling
+export MSYS2_ARG_CONV_EXCL="*"
+exec "$(dirname "$0")/.real_ar.exe" "$@"
+EOF_AR_WRAPPER
+
+  chmod +x "${AR_WRAPPER_DIR}/x86_64-w64-mingw32-ar.exe"
+
+  # Prepend wrapper directory to PATH so configure/Dune finds our wrapper first
+  export PATH="${AR_WRAPPER_DIR}:${PATH}"
+
+  echo "Created ar.exe wrapper at ${AR_WRAPPER_DIR}/x86_64-w64-mingw32-ar.exe"
+  echo "Real ar.exe at ${AR_WRAPPER_DIR}/.real_ar.exe"
+  echo "Wrapper disables MSYS2_ARG_CONV_EXCL for ar invocations only"
 fi
 
 # ==============================================================================
@@ -112,46 +144,6 @@ if [[ "${target_platform}" != "linux-"* ]] && [[ "${target_platform}" != "osx-"*
     echo "PATH: ${PATH}"
     exit 1
   fi
-
-  # ---------------------------------------------------------------------------
-  # Create ar.exe wrapper to disable MSYS2 path conversion
-  # ---------------------------------------------------------------------------
-  # Problem: MSYS2 automatic path conversion mangles ar.exe arguments
-  # When ocamlopt calls: ar.exe rc "archive.a" "file1.o" "file2.o" "file3.o"
-  # MSYS2 converts multiple .o arguments into ONE concatenated path
-  # Solution: Wrapper that disables path conversion ONLY for ar.exe
-  #
-  # We must preserve the original ar.exe and create wrapper in front of it in PATH
-  AR_WRAPPER_DIR="${SRC_DIR}/.ar_wrapper"
-  mkdir -p "${AR_WRAPPER_DIR}"
-
-  # Copy ar.exe from build environment to wrapper directory
-  cp "${BUILD_PREFIX}/Library/bin/x86_64-w64-mingw32-ar.exe" "${AR_WRAPPER_DIR}/.real_ar.exe"
-
-  # Create wrapper script with embedded absolute path to real ar.exe
-  cat > "${AR_WRAPPER_DIR}/x86_64-w64-mingw32-ar.exe" << EOF_AR_WRAPPER
-#!/usr/bin/env bash
-# Disable MSYS2 path conversion for ar.exe to prevent argument mangling
-export MSYS2_ARG_CONV_EXCL="*"
-exec "${AR_WRAPPER_DIR}/.real_ar.exe" "\$@"
-EOF_AR_WRAPPER
-
-  chmod +x "${AR_WRAPPER_DIR}/x86_64-w64-mingw32-ar.exe"
-
-  # Prepend wrapper directory to PATH so ocamlopt finds our wrapper first
-  export PATH="${AR_WRAPPER_DIR}:${PATH}"
-
-  echo "Created ar.exe wrapper at ${AR_WRAPPER_DIR}/x86_64-w64-mingw32-ar.exe"
-  echo "Real ar.exe at ${AR_WRAPPER_DIR}/.real_ar.exe"
-  echo "Wrapper disables MSYS2_ARG_CONV_EXCL for ar invocations only"
-
-  # ---------------------------------------------------------------------------
-  # Disable Dune cache on Windows to prevent silent failures
-  # ---------------------------------------------------------------------------
-  # Problem: Dune cache causes silent build failures on Windows/MSYS2
-  # Solution: Completely disable caching via XDG_CACHE_HOME=/dev/null
-  export XDG_CACHE_HOME=/dev/null
-  echo "Disabled Dune cache (XDG_CACHE_HOME=/dev/null)"
 
   # ---------------------------------------------------------------------------
   # Remove problematic dune rules for Windows
