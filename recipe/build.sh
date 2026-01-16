@@ -253,13 +253,19 @@ fi
 # Run make with failure diagnostics
 if ! make; then
   echo "=== BUILD FAILED - Diagnostics ==="
-  echo "Checking if opam_client.a was created:"
+  echo "Checking key build artifacts:"
+  echo "--- opam_client.a ---"
   ls -la _build/default/src/client/opam_client.a 2>&1 || echo "opam_client.a NOT FOUND"
-  echo "Checking ar.exe being used:"
-  command -v x86_64-w64-mingw32-ar.exe 2>&1 || echo "ar.exe not in PATH"
-  file "$(command -v x86_64-w64-mingw32-ar.exe)" 2>&1 || true
-  echo "Testing ar.exe directly with a few files:"
-  x86_64-w64-mingw32-ar.exe --version 2>&1 || echo "ar --version failed"
+  echo "--- opam_client.cmxa ---"
+  ls -la _build/default/src/client/opam_client.cmxa 2>&1 || echo "opam_client.cmxa NOT FOUND"
+  echo "--- OpamMain.o ---"
+  ls -la _build/default/src/client/.opamMain.eobjs/native/dune__exe__OpamMain.o 2>&1 || echo "OpamMain.o NOT FOUND"
+  echo "--- OpamMain.cmx ---"
+  ls -la _build/default/src/client/.opamMain.eobjs/native/dune__exe__OpamMain.cmx 2>&1 || echo "OpamMain.cmx NOT FOUND"
+  echo "--- opam.exe (final binary) ---"
+  ls -la _build/default/src/client/opam.exe 2>&1 || echo "opam.exe NOT FOUND (expected - linking never started)"
+  echo "--- Dune log for errors ---"
+  cat _build/log 2>&1 | tail -50 || echo "No Dune log found"
   echo "=== End Diagnostics ==="
   exit 1
 fi
