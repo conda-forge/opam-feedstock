@@ -34,6 +34,10 @@ else
   export OCAMLPARAM="verbose=1,_"
   echo "OCAMLPARAM=${OCAMLPARAM} (ocamlopt will show external commands)"
 
+  # Enable verbose Dune output to see why it's failing silently
+  export DUNE_CONFIG__DISPLAY=verbose
+  echo "DUNE_CONFIG__DISPLAY=verbose (Dune will show detailed build plan and errors)"
+
   # Note: MSYS2_ARG_CONV_EXCL is NOT needed - Dune properly quotes ar arguments
   # Previous test failures were due to unquoted variables in our diagnostic script,
   # not in Dune's actual commands. MSYS2 path conversion should work normally.
@@ -176,6 +180,11 @@ if [[ "${target_platform}" != "linux-"* ]] && [[ "${target_platform}" != "osx-"*
   popd > /dev/null
 fi
 
-make
+if [[ "${target_platform}" != "linux-"* ]] && [[ "${target_platform}" != "osx-"* ]]; then
+  # Windows: Use verbose display to see Dune's internal errors
+  make DUNE_OPTS="--display=verbose"
+else
+  make
+fi
 
 make install
