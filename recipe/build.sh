@@ -207,44 +207,40 @@ if [[ "${target_platform}" != "linux-"* ]] && [[ "${target_platform}" != "osx-"*
   echo "C compiler verified in PATH: $(command -v "${CONDA_TOOLCHAIN_HOST}-gcc.exe")"
 
   # ---------------------------------------------------------------------------
-  # Create ar.exe wrapper to diagnose silent failures
+  # Use llvm-ar instead of mingw-ar for better Windows compatibility
   # ---------------------------------------------------------------------------
-  # ar.exe is failing silently when creating opam_client.a
-  # This wrapper will capture stderr, verify file existence, and log details
-  mkdir -p "${SRC_DIR}/wrapper_bin"
-  cat > "${SRC_DIR}/wrapper_bin/x86_64-w64-mingw32-ar.exe" << 'WRAPPER_EOF'
-#!/usr/bin/env bash
-# ar.exe diagnostic wrapper
-REAL_AR="${BUILD_PREFIX}/Library/bin/x86_64-w64-mingw32-ar.exe"
-echo "[ar-wrapper] Called with $# arguments" >&2
-echo "[ar-wrapper] Args: $*" >&2
+  # Problem: x86_64-w64-mingw32-ar.exe fails silently on large archives
+  # Solution: llvm-ar handles many .o files better on Windows
+  #
+  # Create llvm-ar wrapper as x86_64-w64-mingw32-ar.exe
+  MINGW_AR_PATH=$(command -v "${CONDA_TOOLCHAIN_HOST}-ar.exe")
+  if [[ -n "$MINGW_AR_PATH" ]]; then
+    MINGW_AR_DIR=$(dirname "$MINGW_AR_PATH")
+    # Find llvm-ar in conda environment
+    LLVM_AR=$(find "${BUILD_PREFIX}/Library" "${PREFIX}/Library" -name "llvm-ar.exe" -type f 2>/dev/null | head -1)
 
-# Check if all input .o files exist
-for arg in "$@"; do
-  if [[ "$arg" == *.o ]]; then
-    if [[ ! -f "$arg" ]]; then
-      echo "[ar-wrapper] ERROR: Missing input file: $arg" >&2
-      exit 1
+    if [[ -n "$LLVM_AR" ]] && [[ -f "$LLVM_AR" ]]; then
+      echo "Found llvm-ar at: $LLVM_AR"
+
+      # Rename original mingw-ar
+      mv "$MINGW_AR_PATH" "${MINGW_AR_PATH}.orig"
+
+      # Create batch wrapper that calls llvm-ar
+      cat > "$MINGW_AR_PATH" << 'AR_WRAPPER_EOF'
+@echo off
+REM llvm-ar wrapper for x86_64-w64-mingw32-ar.exe
+"%LLVM_AR_FULL%" %*
+AR_WRAPPER_EOF
+
+      # Inject actual llvm-ar path into wrapper
+      sed -i "s|%LLVM_AR_FULL%|${LLVM_AR}|g" "$MINGW_AR_PATH"
+      chmod +x "$MINGW_AR_PATH"
+
+      echo "Replaced ${CONDA_TOOLCHAIN_HOST}-ar.exe with llvm-ar wrapper"
+    else
+      echo "WARNING: llvm-ar.exe not found, using default mingw-ar"
     fi
   fi
-done
-
-# Call real ar and capture output
-echo "[ar-wrapper] Calling: $REAL_AR $*" >&2
-"$REAL_AR" "$@" 2>&1 | tee /tmp/ar-stderr.log
-exit_code=${PIPESTATUS[0]}
-
-if [[ $exit_code -ne 0 ]]; then
-  echo "[ar-wrapper] ERROR: ar.exe exited with code $exit_code" >&2
-  echo "[ar-wrapper] stderr content:" >&2
-  cat /tmp/ar-stderr.log >&2
-fi
-
-exit $exit_code
-WRAPPER_EOF
-  chmod +x "${SRC_DIR}/wrapper_bin/x86_64-w64-mingw32-ar.exe"
-  export PATH="${SRC_DIR}/wrapper_bin:${PATH}"
-  echo "ar.exe wrapper installed in PATH for diagnostics"
 fi
 
 make
