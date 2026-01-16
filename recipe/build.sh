@@ -57,6 +57,29 @@ else
   export MSYS2_ARG_CONV_EXCL="*"
 
   echo "Set MSYS2_ARG_CONV_EXCL=* to prevent ar.exe argument mangling"
+
+  # ---------------------------------------------------------------------------
+  # Create wrapper batch files for unprefixed compiler tool names
+  # ---------------------------------------------------------------------------
+  # Problem: OCaml config reports "c_compiler: gcc" but actual tool is x86_64-w64-mingw32-gcc.exe
+  # Dune's compiler discovery looks for "gcc.exe" based on OCaml config, can't find prefixed version
+  # Solution: Create gcc.bat wrapper that calls the prefixed version
+  # Note: Using .bat (not symlinks) because symlinks are unreliable on Windows
+
+  WRAPPER_DIR="${BUILD_PREFIX}/Library/bin"
+
+  cat > "${WRAPPER_DIR}/gcc.bat" << 'EOFGCC'
+@echo off
+x86_64-w64-mingw32-gcc.exe %*
+EOFGCC
+
+  cat > "${WRAPPER_DIR}/g++.bat" << 'EOFGXX'
+@echo off
+x86_64-w64-mingw32-g++.exe %*
+EOFGXX
+
+  chmod +x "${WRAPPER_DIR}/gcc.bat" "${WRAPPER_DIR}/g++.bat"
+  echo "Created gcc.bat and g++.bat wrappers in ${WRAPPER_DIR}"
 fi
 
 # ==============================================================================
