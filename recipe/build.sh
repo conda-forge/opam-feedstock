@@ -146,6 +146,14 @@ EOF_AR_WRAPPER
   echo "Wrapper disables MSYS2_ARG_CONV_EXCL for ar invocations only"
 
   # ---------------------------------------------------------------------------
+  # Disable Dune cache on Windows to prevent silent failures
+  # ---------------------------------------------------------------------------
+  # Problem: Dune cache causes silent build failures on Windows/MSYS2
+  # Solution: Completely disable caching via XDG_CACHE_HOME=/dev/null
+  export XDG_CACHE_HOME=/dev/null
+  echo "Disabled Dune cache (XDG_CACHE_HOME=/dev/null)"
+
+  # ---------------------------------------------------------------------------
   # Remove problematic dune rules for Windows
   # ---------------------------------------------------------------------------
   # These rules use features not available on Windows/MSYS2
