@@ -183,7 +183,8 @@ fi
 if [[ "${target_platform}" != "linux-"* ]] && [[ "${target_platform}" != "osx-"* ]]; then
   # Windows: Export CC so Dune can find the cross-toolchain C compiler
   # Dune looks for the C compiler in PATH but needs to know the exact name
-  export CC="${CONDA_TOOLCHAIN_HOST}-gcc"
+  # On Windows, executables require .exe extension
+  export CC="${CONDA_TOOLCHAIN_HOST}-gcc.exe"
 
   # Use verbose display to see Dune's internal errors
   make DUNE_ARGS="--display=verbose"
