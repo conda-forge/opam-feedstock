@@ -61,7 +61,11 @@ else
   # 3. Only affects this build process, not system-wide
   export MSYS2_ARG_CONV_EXCL="*"
 
+  # Make ar verbose to diagnose silent failures
+  export ARFLAGS="rcv"
+
   echo "Set MSYS2_ARG_CONV_EXCL=* to prevent ar.exe argument mangling"
+  echo "Set ARFLAGS=rcv for verbose ar output"
 
   # ---------------------------------------------------------------------------
   # Ensure prefixed compiler binaries are in PATH for Dune
@@ -246,6 +250,18 @@ if [[ "${target_platform}" != "linux-"* ]] && [[ "${target_platform}" != "osx-"*
   fi
 fi
 
-make
+# Run make with failure diagnostics
+if ! make; then
+  echo "=== BUILD FAILED - Diagnostics ==="
+  echo "Checking if opam_client.a was created:"
+  ls -la _build/default/src/client/opam_client.a 2>&1 || echo "opam_client.a NOT FOUND"
+  echo "Checking ar.exe being used:"
+  command -v x86_64-w64-mingw32-ar.exe 2>&1 || echo "ar.exe not in PATH"
+  file "$(command -v x86_64-w64-mingw32-ar.exe)" 2>&1 || true
+  echo "Testing ar.exe directly with a few files:"
+  x86_64-w64-mingw32-ar.exe --version 2>&1 || echo "ar --version failed"
+  echo "=== End Diagnostics ==="
+  exit 1
+fi
 
 make install
