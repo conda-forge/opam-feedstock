@@ -238,9 +238,11 @@ if [[ "${target_platform}" != "linux-"* ]] && [[ "${target_platform}" != "osx-"*
   # Create dune-workspace file to explicitly configure C compiler for Windows
   # This tells dune exactly where to find gcc without relying on PATH search
   # Use cygpath -m for forward slashes which don't need escaping in s-expressions
-  # CRITICAL: Use realpath to resolve any symlinks and ensure path is fully expanded
-  GCC_PATH_BASH=$(realpath "$(command -v "${CONDA_TOOLCHAIN_HOST}-gcc.exe")")
-  GCC_PATH_WIN=$(cygpath -m "$GCC_PATH_BASH")
+  # CRITICAL: command -v may return Windows-mixed path, convert to Unix first, then use realpath
+  GCC_PATH_RAW=$(command -v "${CONDA_TOOLCHAIN_HOST}-gcc.exe")
+  GCC_PATH_UNIX=$(cygpath -u "$GCC_PATH_RAW")
+  GCC_PATH_ABS=$(realpath "$GCC_PATH_UNIX")
+  GCC_PATH_WIN=$(cygpath -m "$GCC_PATH_ABS")
 
   cat > dune-workspace <<EOF
 (lang dune 2.8)
