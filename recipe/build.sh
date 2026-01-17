@@ -237,8 +237,9 @@ if [[ "${target_platform}" != "linux-"* ]] && [[ "${target_platform}" != "osx-"*
 
   # Create dune-workspace file to explicitly configure C compiler for Windows
   # This tells dune exactly where to find gcc without relying on PATH search
+  # Use cygpath -m for forward slashes which don't need escaping in s-expressions
   GCC_PATH_BASH=$(command -v "${CONDA_TOOLCHAIN_HOST}-gcc.exe")
-  GCC_PATH_WIN=$(cygpath -w "$GCC_PATH_BASH" | sed 's/\\/\\\\/g')
+  GCC_PATH_WIN=$(cygpath -m "$GCC_PATH_BASH")
 
   cat > dune-workspace <<EOF
 (lang dune 2.8)
@@ -246,7 +247,7 @@ if [[ "${target_platform}" != "linux-"* ]] && [[ "${target_platform}" != "osx-"*
  (default
   (name default)
   (toolchain
-   (c ${GCC_PATH_WIN}))))
+   (c "${GCC_PATH_WIN}"))))
 EOF
 
   echo "Created dune-workspace with explicit C compiler path:"
