@@ -15,20 +15,22 @@ else
   export CC64=false
 
   # Ensure OCaml binaries AND MinGW gcc are in PATH for dune bootstrap
-  # Dune uses Bin.which to search PATH - it DOES respect PATH (contrary to old comments)
-  # The copy workaround was broken because gcc needs cc1 from lib/gcc/...
   #
-  # Key directories:
-  # - BUILD_PREFIX/Library/bin: contains x86_64-w64-mingw32-gcc.exe
-  # - BUILD_PREFIX/Library/mingw-w64/bin: alternative MinGW location
-  # - BUILD_PREFIX/bin: OCaml tools
-  export PATH="${BUILD_PREFIX}/Library/bin:${BUILD_PREFIX}/Library/mingw-w64/bin:${BUILD_PREFIX}/bin:${PATH}"
+  # CRITICAL: dune.exe is a Windows native binary. It cannot interpret MSYS2-style
+  # paths like /d/bld/... in the PATH variable. We must use Windows-style paths.
+  #
+  # Conda-build provides two versions of path variables on Windows:
+  # - BUILD_PREFIX: MSYS2-style path (e.g., /d/bld/...)
+  # - _BUILD_PREFIX_: Windows-style path (e.g., D:/bld/...)
+  #
+  # We MUST use _BUILD_PREFIX_ so dune.exe can find gcc when searching PATH.
+  export PATH="${_BUILD_PREFIX_}/Library/bin:${_BUILD_PREFIX_}/Library/mingw-w64/bin:${_BUILD_PREFIX_}/bin:${PATH}"
 
-  echo "=== Windows PATH setup (no copy workaround - gcc needs its full toolchain) ==="
-  echo "PATH includes:"
-  echo "  - ${BUILD_PREFIX}/Library/bin"
-  echo "  - ${BUILD_PREFIX}/Library/mingw-w64/bin"
-  echo "  - ${BUILD_PREFIX}/bin"
+  echo "=== Windows PATH setup (using _BUILD_PREFIX_ for Windows-native dune.exe) ==="
+  echo "PATH includes (Windows-style paths):"
+  echo "  - ${_BUILD_PREFIX_}/Library/bin"
+  echo "  - ${_BUILD_PREFIX_}/Library/mingw-w64/bin"
+  echo "  - ${_BUILD_PREFIX_}/bin"
 
   # Make ocamlopt verbose to see ar/as/ld commands for debugging archive creation
   export OCAMLPARAM="verbose=1,_"
