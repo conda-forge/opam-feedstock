@@ -19,18 +19,20 @@ else
   # CRITICAL: dune.exe is a Windows native binary. It cannot interpret MSYS2-style
   # paths like /d/bld/... in the PATH variable. We must use Windows-style paths.
   #
-  # Conda-build provides two versions of path variables on Windows:
-  # - BUILD_PREFIX: MSYS2-style path (e.g., /d/bld/...)
-  # - _BUILD_PREFIX_: Windows-style path (e.g., D:/bld/...)
-  #
-  # We MUST use _BUILD_PREFIX_ so dune.exe can find gcc when searching PATH.
-  export PATH="${_BUILD_PREFIX_}/Library/bin:${_BUILD_PREFIX_}/Library/mingw-w64/bin:${_BUILD_PREFIX_}/bin:${PATH}"
+  # Convert MSYS2 paths to Windows paths that dune.exe can understand.
+  # Use cygpath to convert /d/bld/... to D:/bld/... format.
+  BUILD_PREFIX_WIN=$(cygpath -m "${BUILD_PREFIX}")
 
-  echo "=== Windows PATH setup (using _BUILD_PREFIX_ for Windows-native dune.exe) ==="
-  echo "PATH includes (Windows-style paths):"
-  echo "  - ${_BUILD_PREFIX_}/Library/bin"
-  echo "  - ${_BUILD_PREFIX_}/Library/mingw-w64/bin"
-  echo "  - ${_BUILD_PREFIX_}/bin"
+  # Prepend Windows-style paths to PATH for Windows native executables like dune.exe
+  export PATH="${BUILD_PREFIX_WIN}/Library/bin:${BUILD_PREFIX_WIN}/Library/mingw-w64/bin:${BUILD_PREFIX_WIN}/bin:${PATH}"
+
+  echo "=== Windows PATH setup (converted MSYS2 paths to Windows format for dune.exe) ==="
+  echo "BUILD_PREFIX (MSYS2): ${BUILD_PREFIX}"
+  echo "BUILD_PREFIX_WIN: ${BUILD_PREFIX_WIN}"
+  echo "PATH additions:"
+  echo "  - ${BUILD_PREFIX_WIN}/Library/bin"
+  echo "  - ${BUILD_PREFIX_WIN}/Library/mingw-w64/bin"
+  echo "  - ${BUILD_PREFIX_WIN}/bin"
 
   # Make ocamlopt verbose to see ar/as/ld commands for debugging archive creation
   export OCAMLPARAM="verbose=1,_"
@@ -100,11 +102,12 @@ fi
 # 1. Build dune with native compiler (it runs on build machine)
 # 2. Swap to cross-compiler for the main opam build
 
+export QEMU_LD_PREFIX="${BUILD_PREFIX}/${CONDA_TOOLCHAIN_HOST}/sysroot"
 if [[ "${target_platform}" != "${build_platform:-${target_platform}}" ]]; then
   # Configure first (uses native tools for detection)
   ./configure \
     --build="${CONDA_TOOLCHAIN_BUILD}" \
-    --host="${CONDA_TOOLCHAIN_BUILD}" \
+    --host="${CONDA_TOOLCHAIN_HOST}" \
     --target="${CONDA_TOOLCHAIN_HOST}" \
     --prefix="${OPAM_INSTALL_PREFIX}" \
     --with-vendored-deps \
