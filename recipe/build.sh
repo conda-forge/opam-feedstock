@@ -15,24 +15,34 @@ else
   export CC64=false
 
   # Ensure OCaml binaries AND MinGW gcc are in PATH for dune bootstrap
+  # Dune uses Bin.which to search PATH - it DOES respect PATH (contrary to old comments)
+  # The copy workaround was broken because gcc needs cc1 from lib/gcc/...
   #
-  # CRITICAL: dune.exe is a Windows native binary. It cannot interpret MSYS2-style
-  # paths like /d/bld/... in the PATH variable. We must use Windows-style paths.
+  # Key directories:
+  # - BUILD_PREFIX/Library/bin: contains x86_64-w64-mingw32-gcc.exe
+  # - BUILD_PREFIX/Library/mingw-w64/bin: alternative MinGW location
+  # - BUILD_PREFIX/bin: OCaml tools
+  export PATH="${BUILD_PREFIX}/Library/bin:${BUILD_PREFIX}/Library/mingw-w64/bin:${BUILD_PREFIX}/bin:${PATH}"
+
+  echo "=== Windows build setup ==="
+  echo "PATH updated with OCaml and gcc directories"
+
+  # CRITICAL FIX for dune.exe C compiler discovery:
+  # Dune is a Windows native .exe that cannot find gcc via PATH when PATH contains
+  # MSYS2-style paths. Explicitly set CC to the full Windows path so Dune doesn't
+  # need to search PATH at all.
   #
-  # Convert MSYS2 paths to Windows paths that dune.exe can understand.
-  # Use cygpath to convert /d/bld/... to D:/bld/... format.
-  BUILD_PREFIX_WIN=$(cygpath -m "${BUILD_PREFIX}")
+  # Find gcc and convert its path to Windows format for dune.exe
+  GCC_MSYS_PATH=$(command -v x86_64-w64-mingw32-gcc.exe)
+  if [ -z "$GCC_MSYS_PATH" ]; then
+    echo "ERROR: x86_64-w64-mingw32-gcc.exe not found in PATH"
+    exit 1
+  fi
+  export CC=$(cygpath -w "$GCC_MSYS_PATH")
+  export CXX=$(cygpath -w "$(dirname "$GCC_MSYS_PATH")/x86_64-w64-mingw32-g++.exe")
 
-  # Prepend Windows-style paths to PATH for Windows native executables like dune.exe
-  export PATH="${BUILD_PREFIX_WIN}/Library/bin:${BUILD_PREFIX_WIN}/Library/mingw-w64/bin:${BUILD_PREFIX_WIN}/bin:${PATH}"
-
-  echo "=== Windows PATH setup (converted MSYS2 paths to Windows format for dune.exe) ==="
-  echo "BUILD_PREFIX (MSYS2): ${BUILD_PREFIX}"
-  echo "BUILD_PREFIX_WIN: ${BUILD_PREFIX_WIN}"
-  echo "PATH additions:"
-  echo "  - ${BUILD_PREFIX_WIN}/Library/bin"
-  echo "  - ${BUILD_PREFIX_WIN}/Library/mingw-w64/bin"
-  echo "  - ${BUILD_PREFIX_WIN}/bin"
+  echo "Set CC=$CC (Windows path for dune.exe)"
+  echo "Set CXX=$CXX (Windows path for dune.exe)"
 
   # Make ocamlopt verbose to see ar/as/ld commands for debugging archive creation
   export OCAMLPARAM="verbose=1,_"
