@@ -28,21 +28,31 @@ else
   echo "PATH updated with OCaml and gcc directories"
 
   # CRITICAL FIX for dune.exe C compiler discovery:
-  # Dune is a Windows native .exe that cannot find gcc via PATH when PATH contains
-  # MSYS2-style paths. Explicitly set CC to the full Windows path so Dune doesn't
-  # need to search PATH at all.
+  # Dune is a Windows native .exe that reads PATH literally without MSYS2 conversion.
+  # When PATH contains /d/bld/..., Windows executables cannot interpret it.
   #
-  # Find gcc and convert its path to Windows format for dune.exe
-  GCC_MSYS_PATH=$(command -v x86_64-w64-mingw32-gcc.exe)
-  if [ -z "$GCC_MSYS_PATH" ]; then
-    echo "ERROR: x86_64-w64-mingw32-gcc.exe not found in PATH"
+  # Solution: Find the actual installed gcc path and convert it to Windows format,
+  # then use MSYS2_ENV_CONV_EXCL to prevent bash from reconverting it.
+
+  # First, verify gcc is in PATH (bash can find it)
+  if ! command -v x86_64-w64-mingw32-gcc.exe >/dev/null 2>&1; then
+    echo "ERROR: x86_64-w64-mingw32-gcc.exe not found in bash PATH"
     exit 1
   fi
-  export CC=$(cygpath -w "$GCC_MSYS_PATH")
-  export CXX=$(cygpath -w "$(dirname "$GCC_MSYS_PATH")/x86_64-w64-mingw32-g++.exe")
 
-  echo "Set CC=$CC (Windows path for dune.exe)"
-  echo "Set CXX=$CXX (Windows path for dune.exe)"
+  # Get the actual installation directory (before PATH munging)
+  # In conda/rattler-build, compilers are always in BUILD_PREFIX/Library/bin
+  # We need to add this in Windows format to a new DUNE_CC_PATH variable
+  GCC_DIR_MSYS="${BUILD_PREFIX}/Library/bin"
+  GCC_DIR_WIN=$(cygpath -w "$GCC_DIR_MSYS" 2>/dev/null || echo "$GCC_DIR_MSYS")
+
+  # Export for dune to use - but in Windows format
+  export DUNE_CC="${GCC_DIR_WIN}\\x86_64-w64-mingw32-gcc.exe"
+  export DUNE_CXX="${GCC_DIR_WIN}\\x86_64-w64-mingw32-g++.exe"
+
+  echo "Dune C compiler paths (Windows format):"
+  echo "  DUNE_CC=${DUNE_CC}"
+  echo "  DUNE_CXX=${DUNE_CXX}"
 
   # Make ocamlopt verbose to see ar/as/ld commands for debugging archive creation
   export OCAMLPARAM="verbose=1,_"
@@ -224,6 +234,23 @@ if [[ "${target_platform}" != "linux-"* ]] && [[ "${target_platform}" != "osx-"*
     exit 1
   fi
   echo "C compiler verified in PATH: $(command -v "${CONDA_TOOLCHAIN_HOST}-gcc.exe")"
+
+  # Create dune-workspace file to explicitly configure C compiler for Windows
+  # This tells dune exactly where to find gcc without relying on PATH search
+  GCC_PATH_BASH=$(command -v "${CONDA_TOOLCHAIN_HOST}-gcc.exe")
+  GCC_PATH_WIN=$(cygpath -w "$GCC_PATH_BASH" | sed 's/\\/\\\\/g')
+
+  cat > dune-workspace <<EOF
+(lang dune 2.8)
+(context
+ (default
+  (name default)
+  (toolchain
+   (c ${GCC_PATH_WIN}))))
+EOF
+
+  echo "Created dune-workspace with explicit C compiler path:"
+  cat dune-workspace
 
   # ---------------------------------------------------------------------------
   # ar.exe info (no replacement - using original ar)
