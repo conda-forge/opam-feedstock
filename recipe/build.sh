@@ -237,13 +237,33 @@ if [[ "${target_platform}" != "linux-"* ]] && [[ "${target_platform}" != "osx-"*
 
   # Create dune-workspace file to explicitly configure C compiler for Windows
   # This tells dune exactly where to find gcc without relying on PATH search
-  # Use cygpath -m for forward slashes which don't need escaping in s-expressions
-  # CRITICAL: Do NOT use command -v, it returns paths with literal %BUILD_PREFIX% on Windows
-  # Instead, construct path directly from known BUILD_PREFIX environment variable
-  GCC_PATH_UNIX="${BUILD_PREFIX}/Library/bin/${CONDA_TOOLCHAIN_HOST}-gcc.exe"
-  GCC_PATH_WIN=$(cygpath -m "$GCC_PATH_UNIX")
+  #
+  # CRITICAL: BUILD_PREFIX contains literal "%BUILD_PREFIX%" placeholder on Windows!
+  # But _BUILD_PREFIX (no trailing underscore) has /c/... Unix format
+  # And _BUILD_PREFIX_ has C:/... Windows format
+  # Try both to find one that works
+  echo "=== Debugging prefix variables ==="
+  echo "BUILD_PREFIX=${BUILD_PREFIX}"
+  echo "_BUILD_PREFIX=${_BUILD_PREFIX:-unset}"
+  echo "_BUILD_PREFIX_=${_BUILD_PREFIX_:-unset}"
 
-  echo "GCC path for dune-workspace: ${GCC_PATH_WIN}"
+  # Use _BUILD_PREFIX (Unix /c/... format) if available, convert to Windows
+  if [[ -n "${_BUILD_PREFIX:-}" ]]; then
+    GCC_PATH_UNIX="${_BUILD_PREFIX}/Library/bin/${CONDA_TOOLCHAIN_HOST}-gcc.exe"
+    GCC_WIN_PATH=$(cygpath -m "$GCC_PATH_UNIX")
+    echo "Using _BUILD_PREFIX: ${GCC_PATH_UNIX} -> ${GCC_WIN_PATH}"
+  elif [[ -n "${_BUILD_PREFIX_:-}" ]]; then
+    # _BUILD_PREFIX_ already has C:/... format, just use it
+    GCC_WIN_PATH="${_BUILD_PREFIX_}/Library/bin/${CONDA_TOOLCHAIN_HOST}-gcc.exe"
+    echo "Using _BUILD_PREFIX_: ${GCC_WIN_PATH}"
+  else
+    # Fallback: use command -v and convert
+    GCC_BASH_PATH=$(command -v "${CONDA_TOOLCHAIN_HOST}-gcc.exe")
+    GCC_WIN_PATH=$(cygpath -am "$GCC_BASH_PATH")
+    echo "Using command -v fallback: ${GCC_BASH_PATH} -> ${GCC_WIN_PATH}"
+  fi
+
+  echo "GCC path for dune-workspace: ${GCC_WIN_PATH}"
 
   cat > dune-workspace <<EOF
 (lang dune 2.8)
@@ -251,7 +271,7 @@ if [[ "${target_platform}" != "linux-"* ]] && [[ "${target_platform}" != "osx-"*
  (default
   (name default)
   (toolchain
-   (c "${GCC_PATH_WIN}"))))
+   (c "${GCC_WIN_PATH}"))))
 EOF
 
   echo "Created dune-workspace with explicit C compiler path:"
