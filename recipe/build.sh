@@ -250,7 +250,7 @@ if [[ "${target_platform}" != "linux-"* ]] && [[ "${target_platform}" != "osx-"*
   # Use _BUILD_PREFIX (Unix /c/... format) if available, convert to Windows
   if [[ -n "${_BUILD_PREFIX:-}" ]]; then
     GCC_PATH_UNIX="${_BUILD_PREFIX}/Library/bin/${CONDA_TOOLCHAIN_HOST}-gcc.exe"
-    GCC_WIN_PATH=$(cygpath -m "$GCC_PATH_UNIX")
+    GCC_WIN_PATH=$(cygpath -w "$GCC_PATH_UNIX")
     echo "Using _BUILD_PREFIX: ${GCC_PATH_UNIX} -> ${GCC_WIN_PATH}"
   elif [[ -n "${_BUILD_PREFIX_:-}" ]]; then
     # _BUILD_PREFIX_ already has C:/... format, just use it
@@ -259,7 +259,7 @@ if [[ "${target_platform}" != "linux-"* ]] && [[ "${target_platform}" != "osx-"*
   else
     # Fallback: use command -v and convert
     GCC_BASH_PATH=$(command -v "${CONDA_TOOLCHAIN_HOST}-gcc.exe")
-    GCC_WIN_PATH=$(cygpath -am "$GCC_BASH_PATH")
+    GCC_WIN_PATH=$(cygpath -w "$GCC_BASH_PATH")
     echo "Using command -v fallback: ${GCC_BASH_PATH} -> ${GCC_WIN_PATH}"
   fi
 
