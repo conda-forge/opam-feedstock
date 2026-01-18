@@ -248,18 +248,21 @@ if [[ "${target_platform}" != "linux-"* ]] && [[ "${target_platform}" != "osx-"*
   echo "_BUILD_PREFIX_=${_BUILD_PREFIX_:-unset}"
 
   # Use _BUILD_PREFIX (Unix /c/... format) if available, convert to Windows
+  # CRITICAL: Don't use cygpath - it substitutes %BUILD_PREFIX% placeholder!
+  # Manual conversion: /d/path -> D:/path (mixed Windows format with forward slashes)
   if [[ -n "${_BUILD_PREFIX:-}" ]]; then
     GCC_PATH_UNIX="${_BUILD_PREFIX}/Library/bin/${CONDA_TOOLCHAIN_HOST}-gcc.exe"
-    GCC_WIN_PATH=$(cygpath -w "$GCC_PATH_UNIX")
+    # Convert /d/... to D:/... format manually
+    GCC_WIN_PATH=$(echo "$GCC_PATH_UNIX" | sed 's|^/\([a-z]\)/|\U\1:/|')
     echo "Using _BUILD_PREFIX: ${GCC_PATH_UNIX} -> ${GCC_WIN_PATH}"
   elif [[ -n "${_BUILD_PREFIX_:-}" ]]; then
     # _BUILD_PREFIX_ already has C:/... format, just use it
     GCC_WIN_PATH="${_BUILD_PREFIX_}/Library/bin/${CONDA_TOOLCHAIN_HOST}-gcc.exe"
     echo "Using _BUILD_PREFIX_: ${GCC_WIN_PATH}"
   else
-    # Fallback: use command -v and convert
+    # Fallback: use command -v and convert manually
     GCC_BASH_PATH=$(command -v "${CONDA_TOOLCHAIN_HOST}-gcc.exe")
-    GCC_WIN_PATH=$(cygpath -w "$GCC_BASH_PATH")
+    GCC_WIN_PATH=$(echo "$GCC_BASH_PATH" | sed 's|^/\([a-z]\)/|\U\1:/|')
     echo "Using command -v fallback: ${GCC_BASH_PATH} -> ${GCC_WIN_PATH}"
   fi
 
