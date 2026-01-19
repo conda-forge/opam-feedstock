@@ -387,6 +387,12 @@ WRAPPER_C_EOF
   WRAPPER_DIR="${_SRC_DIR_}/.ar_wrapper"
   export PATH="${WRAPPER_DIR}:${PATH}"
   echo "Added wrapper directory to PATH: ${WRAPPER_DIR}"
+
+  # Copy symlinks to BUILD_PREFIX/bin where Dune will find them (already in PATH)
+  # This avoids PATH parsing issues with Dune (Windows exe that expects semicolon-separated paths)
+  cp -f ".ar_wrapper/conda-ocaml-cc.exe" "${BUILD_PREFIX}/bin/"
+  cp -f ".ar_wrapper/conda-ocaml-as.exe" "${BUILD_PREFIX}/bin/"
+  echo "Copied wrapper symlinks to BUILD_PREFIX/bin for Dune to find"
   echo "Contents of wrapper directory:"
   ls -la ".ar_wrapper/"
   echo "Testing which finds wrapper versions:"

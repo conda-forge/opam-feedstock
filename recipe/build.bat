@@ -11,6 +11,9 @@ echo   conda activate "${PREFIX}"                     >> conda_build.sh
 echo   conda activate --stack "${BUILD_PREFIX}"       >> conda_build.sh
 echo fi                                               >> conda_build.sh
 echo CONDA_PREFIX=${CONDA_PREFIX//\\//}               >> conda_build.sh
+echo export _PREFIX_=%_PREFIX_%                       >> conda_build.sh
+echo export _BUILD_PREFIX_=%_BUILD_PREFIX_%           >> conda_build.sh
+echo export _SRC_DIR_=%_SRC_DIR_%                     >> conda_build.sh
 type "%RECIPE_DIR%\build.sh"                          >> conda_build.sh
 
 :: Convert backslashes using delayed expansion to avoid issues with unexpanded %VAR% placeholders
@@ -23,7 +26,7 @@ set "_RECIPE_DIR=!RECIPE_DIR:\=/!"
 :: These are exported to bash for use in patching GHC settings files
 set "_PREFIX_=!_PREFIX!"
 set "_BUILD_PREFIX_=!_BUILD_PREFIX!"
-set _SRC_DIR_=%_SRC_DIR%
+set "_SRC_DIR_=!_SRC_DIR!"
 
 :: Convert C: and D: to /c, /d (Unix-style for bash/configure)
 set "_PREFIX=!_PREFIX:C:=/c/!"
