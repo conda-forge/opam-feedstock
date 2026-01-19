@@ -390,8 +390,16 @@ WRAPPER_C_EOF
 
   # Copy symlinks to BUILD_PREFIX/bin where Dune will find them (already in PATH)
   # This avoids PATH parsing issues with Dune (Windows exe that expects semicolon-separated paths)
-  cp -f ".ar_wrapper/conda-ocaml-cc.exe" "${BUILD_PREFIX}/bin/"
-  cp -f ".ar_wrapper/conda-ocaml-as.exe" "${BUILD_PREFIX}/bin/"
+  echo "DEBUG: BUILD_PREFIX=${BUILD_PREFIX}"
+  echo "DEBUG: _BUILD_PREFIX_=${_BUILD_PREFIX_}"
+  echo "DEBUG: Checking if ${BUILD_PREFIX}/bin exists..."
+  ls -ld "${BUILD_PREFIX}/bin" || echo "NOT FOUND"
+  echo "DEBUG: Checking if ${_BUILD_PREFIX_}/bin exists..."
+  ls -ld "${_BUILD_PREFIX_}/bin" || echo "NOT FOUND"
+
+  # Use _BUILD_PREFIX_ which is exported from build.bat with Windows-format path
+  cp -f ".ar_wrapper/conda-ocaml-cc.exe" "${_BUILD_PREFIX_}/bin/"
+  cp -f ".ar_wrapper/conda-ocaml-as.exe" "${_BUILD_PREFIX_}/bin/"
   echo "Copied wrapper symlinks to BUILD_PREFIX/bin for Dune to find"
   echo "Contents of wrapper directory:"
   ls -la ".ar_wrapper/"
