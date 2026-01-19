@@ -383,8 +383,8 @@ WRAPPER_C_EOF
   done
 
   # Add wrapper directory to PATH (before BUILD_PREFIX so it's found first)
-  # Use SRC_DIR from conda-build environment (already correct format)
-  WRAPPER_DIR="${SRC_DIR}/.ar_wrapper"
+  # Use _SRC_DIR_ from build.bat (Windows format with forward slashes: D:/bld/...)
+  WRAPPER_DIR="${_SRC_DIR_}/.ar_wrapper"
   export PATH="${WRAPPER_DIR}:${PATH}"
   echo "Added wrapper directory to PATH: ${WRAPPER_DIR}"
   echo "Contents of wrapper directory:"
