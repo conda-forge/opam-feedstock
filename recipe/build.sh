@@ -294,10 +294,10 @@ if [[ "${target_platform}" != "linux-"* ]] && [[ "${target_platform}" != "osx-"*
   echo "Real ar (Windows path): ${REAL_AR_WIN}"
 
   # Create wrapper directory
-  mkdir -p "${SRC_DIR}/.ar_wrapper"
+  mkdir -p ".ar_wrapper"
 
   # Write C source for the wrapper
-  cat > "${SRC_DIR}/.ar_wrapper/ar_wrapper.c" << 'WRAPPER_C_EOF'
+  cat > ".ar_wrapper/ar_wrapper.c" << 'WRAPPER_C_EOF'
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -341,25 +341,27 @@ WRAPPER_C_EOF
 
   # Substitute the real ar path into the source
   # Using forward slashes so no escaping needed
-  sed -i "s|REAL_AR_PATH_PLACEHOLDER|${REAL_AR_WIN}|" "${SRC_DIR}/.ar_wrapper/ar_wrapper.c"
+  sed -i "s|REAL_AR_PATH_PLACEHOLDER|${REAL_AR_WIN}|" ".ar_wrapper/ar_wrapper.c"
 
   echo "Compiling ar wrapper..."
-  cat "${SRC_DIR}/.ar_wrapper/ar_wrapper.c"
+  cat ".ar_wrapper/ar_wrapper.c"
 
   # Compile the wrapper using MinGW gcc
-  "${CONDA_TOOLCHAIN_HOST}-gcc.exe" -O2 -o "${SRC_DIR}/.ar_wrapper/conda-ocaml-ar.exe" "${SRC_DIR}/.ar_wrapper/ar_wrapper.c"
+  "${CONDA_TOOLCHAIN_HOST}-gcc.exe" -O2 -o ".ar_wrapper/conda-ocaml-ar.exe" ".ar_wrapper/ar_wrapper.c"
 
-  if [[ -f "${SRC_DIR}/.ar_wrapper/conda-ocaml-ar.exe" ]]; then
+  if [[ -f ".ar_wrapper/conda-ocaml-ar.exe" ]]; then
     echo "Wrapper compiled successfully"
-    ls -la "${SRC_DIR}/.ar_wrapper/conda-ocaml-ar.exe"
+    ls -la ".ar_wrapper/conda-ocaml-ar.exe"
   else
     echo "ERROR: Failed to compile ar wrapper"
     exit 1
   fi
 
   # Add wrapper directory to PATH (before BUILD_PREFIX so it's found first)
-  export PATH="${SRC_DIR}/.ar_wrapper:${PATH}"
-  echo "Added ar wrapper to PATH"
+  # Use pwd to get clean path instead of SRC_DIR which may have mixed formats
+  WRAPPER_DIR="$(pwd)/.ar_wrapper"
+  export PATH="${WRAPPER_DIR}:${PATH}"
+  echo "Added ar wrapper to PATH: ${WRAPPER_DIR}"
   echo "Wrapper test - which conda-ocaml-ar.exe:"
   which conda-ocaml-ar.exe
 fi
