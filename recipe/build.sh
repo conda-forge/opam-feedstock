@@ -19,10 +19,15 @@ else
   # The copy workaround was broken because gcc needs cc1 from lib/gcc/...
   #
   # Key directories:
-  # - BUILD_PREFIX/Library/bin: contains x86_64-w64-mingw32-gcc.exe
+  # - BUILD_PREFIX/Library/bin: contains conda-ocaml-cc.exe and OCaml tools
   # - BUILD_PREFIX/Library/mingw-w64/bin: alternative MinGW location
-  # - BUILD_PREFIX/bin: OCaml tools
-  export PATH="${BUILD_PREFIX}/Library/bin:${BUILD_PREFIX}/Library/mingw-w64/bin:${BUILD_PREFIX}/bin:${PATH}"
+  # - BUILD_PREFIX/bin: additional tools
+  #
+  # CRITICAL: Use ${_BUILD_PREFIX_} which is D:/xxx/xxx format (Windows absolute with forward slashes)
+  # Dune's Path.of_filename_relative_to_initial_cwd uses Filename.is_relative to check paths.
+  # On Windows, /d/xxx is considered RELATIVE (no drive letter), so Dune prepends cwd → wrong path!
+  # D:/xxx is correctly recognized as absolute, so Dune uses it directly.
+  export PATH="${_BUILD_PREFIX_}/Library/bin:${_BUILD_PREFIX_}/Library/mingw-w64/bin:${_BUILD_PREFIX_}/bin:${PATH}"
 
   echo "=== Windows build setup ==="
   echo "PATH updated with OCaml and gcc directories"
@@ -222,10 +227,37 @@ if [[ "${target_platform}" != "linux-"* ]] && [[ "${target_platform}" != "osx-"*
 fi
 
 if [[ "${target_platform}" != "linux-"* ]] && [[ "${target_platform}" != "osx-"* ]]; then
-  # Windows: Applied patch to fix Dune's which.ml double-.exe bug
-  # Verify OCaml's compiler setting
-  echo "OCaml compiler native_c_compiler setting:"
-  "${BUILD_PREFIX}/Library/bin/ocamlc.opt.exe" -config | grep "native_c_compiler"
+  # ===========================================================================
+  # DEBUG: Dump all C compiler related fields from ocamlc -config
+  # ===========================================================================
+  echo "=== DEBUG: Full ocamlc -config C compiler fields ==="
+  "${BUILD_PREFIX}/Library/bin/ocamlc.opt.exe" -config | grep -E "c_compiler|bytecomp_c|native_c|ccomp|asm"
+  echo ""
+  echo "=== DEBUG: PATH entries (first 10) ==="
+  echo "${PATH}" | tr ':' '\n' | head -10
+  echo ""
+  echo "=== DEBUG: PATH in Windows format (what Dune sees) ==="
+  # Dune is a Windows exe - it sees PATH with ; separator
+  # Show what format the paths are in
+  for p in $(echo "${PATH}" | tr ':' '\n' | head -5); do
+    echo "  PATH entry: $p"
+    if [[ -d "$p" ]]; then
+      echo "    -> exists as directory"
+      # Check if conda-ocaml-cc.exe is in this directory
+      if [[ -f "$p/conda-ocaml-cc.exe" ]]; then
+        echo "    -> CONTAINS conda-ocaml-cc.exe"
+      fi
+    else
+      echo "    -> NOT a directory (Dune won't find anything here)"
+    fi
+  done
+  echo ""
+  echo "=== DEBUG: Checking if Dune's Filename.is_relative would treat paths as relative ==="
+  echo "Path format analysis:"
+  echo "  /d/bld/... -> starts with / but no drive letter -> Filename.is_relative = TRUE (WRONG for Windows!)"
+  echo "  D:/bld/... -> starts with D: -> Filename.is_relative = FALSE (correct)"
+  echo "  D:\\bld\\... -> starts with D: -> Filename.is_relative = FALSE (correct)"
+  echo ""
 
   # Verify C compiler is in PATH
   if ! command -v "${CONDA_TOOLCHAIN_HOST}-gcc.exe" >/dev/null 2>&1; then
