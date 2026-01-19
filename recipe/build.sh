@@ -278,66 +278,88 @@ if [[ "${target_platform}" != "linux-"* ]] && [[ "${target_platform}" != "osx-"*
   # Problem: conda-ocaml-ar.exe (OCaml's ar wrapper) returns non-zero exit codes
   # even when the archive is successfully created. This causes make to fail.
   #
-  # Solution: Create a wrapper that:
+  # Solution: Compile a C wrapper that:
   # 1. Calls the real conda-ocaml-ar.exe
   # 2. Checks if the archive file was created
   # 3. Returns 0 if the file exists, regardless of ar's exit code
   #
-  # The wrapper is placed in SRC_DIR which is added to PATH before BUILD_PREFIX,
-  # so it gets found first when OCaml invokes 'conda-ocaml-ar.exe'.
+  # The wrapper is a native Windows exe placed before BUILD_PREFIX in PATH.
 
   REAL_AR=$(command -v conda-ocaml-ar.exe)
+  REAL_AR_WIN=$(cygpath -w "${REAL_AR}" 2>/dev/null || echo "${REAL_AR}")
   echo "Creating ar wrapper to handle false-positive exit codes"
   echo "Real conda-ocaml-ar.exe: ${REAL_AR}"
+  echo "Real ar (Windows path): ${REAL_AR_WIN}"
 
-  # Create wrapper script
+  # Create wrapper directory
   mkdir -p "${SRC_DIR}/.ar_wrapper"
-  cat > "${SRC_DIR}/.ar_wrapper/conda-ocaml-ar.exe" << 'WRAPPER_EOF'
-#!/bin/bash
-# Wrapper for conda-ocaml-ar.exe that ignores exit codes when archive is created
 
-REAL_AR="__REAL_AR_PATH__"
+  # Write C source for the wrapper
+  cat > "${SRC_DIR}/.ar_wrapper/ar_wrapper.c" << 'WRAPPER_C_EOF'
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <process.h>
+#include <io.h>
 
-# Parse arguments to find the output file
-# ar syntax: ar [options] archive [member...]
-# Common usage: ar rc archive.a file1.o file2.o ...
-OUTPUT_FILE=""
-for arg in "$@"; do
-  case "$arg" in
-    *.a)
-      OUTPUT_FILE="$arg"
-      break
-      ;;
-  esac
-done
+int main(int argc, char *argv[]) {
+    // Find the output file (first .a argument)
+    char *output_file = NULL;
+    for (int i = 1; i < argc; i++) {
+        char *arg = argv[i];
+        size_t len = strlen(arg);
+        if (len > 2 && strcmp(arg + len - 2, ".a") == 0) {
+            output_file = arg;
+            break;
+        }
+    }
 
-# Call the real ar
-"$REAL_AR" "$@"
-AR_EXIT=$?
+    // Build command line for the real ar
+    // Note: REAL_AR_PATH is substituted during build
+    const char *real_ar = "REAL_AR_PATH_PLACEHOLDER";
 
-# If ar succeeded, return its exit code
-if [[ $AR_EXIT -eq 0 ]]; then
-  exit 0
-fi
+    // Call the real ar using spawnvp
+    int result = _spawnvp(_P_WAIT, real_ar, (const char * const *)argv);
 
-# If ar failed but the archive was created, ignore the error
-if [[ -n "$OUTPUT_FILE" ]] && [[ -f "$OUTPUT_FILE" ]]; then
-  echo "ar wrapper: Ignoring exit code $AR_EXIT because $OUTPUT_FILE was created" >&2
-  exit 0
-fi
+    // If ar succeeded, return its exit code
+    if (result == 0) {
+        return 0;
+    }
 
-# Otherwise, propagate the error
-exit $AR_EXIT
-WRAPPER_EOF
+    // If ar failed but the archive was created, ignore the error
+    if (output_file != NULL && _access(output_file, 0) == 0) {
+        fprintf(stderr, "ar wrapper: Ignoring exit code %d because %s was created\n", result, output_file);
+        return 0;
+    }
 
-  # Substitute the real ar path into the wrapper
-  sed -i "s|__REAL_AR_PATH__|${REAL_AR}|" "${SRC_DIR}/.ar_wrapper/conda-ocaml-ar.exe"
-  chmod +x "${SRC_DIR}/.ar_wrapper/conda-ocaml-ar.exe"
+    // Otherwise, propagate the error
+    return result;
+}
+WRAPPER_C_EOF
+
+  # Substitute the real ar path into the source
+  # Need to escape backslashes for C string
+  REAL_AR_C_ESCAPED=$(echo "${REAL_AR_WIN}" | sed 's/\\/\\\\/g')
+  sed -i "s|REAL_AR_PATH_PLACEHOLDER|${REAL_AR_C_ESCAPED}|" "${SRC_DIR}/.ar_wrapper/ar_wrapper.c"
+
+  echo "Compiling ar wrapper..."
+  cat "${SRC_DIR}/.ar_wrapper/ar_wrapper.c"
+
+  # Compile the wrapper using MinGW gcc
+  "${CONDA_TOOLCHAIN_HOST}-gcc.exe" -O2 -o "${SRC_DIR}/.ar_wrapper/conda-ocaml-ar.exe" "${SRC_DIR}/.ar_wrapper/ar_wrapper.c"
+
+  if [[ -f "${SRC_DIR}/.ar_wrapper/conda-ocaml-ar.exe" ]]; then
+    echo "Wrapper compiled successfully"
+    ls -la "${SRC_DIR}/.ar_wrapper/conda-ocaml-ar.exe"
+  else
+    echo "ERROR: Failed to compile ar wrapper"
+    exit 1
+  fi
 
   # Add wrapper directory to PATH (before BUILD_PREFIX so it's found first)
   export PATH="${SRC_DIR}/.ar_wrapper:${PATH}"
   echo "Added ar wrapper to PATH"
-  echo "Wrapper test:"
+  echo "Wrapper test - which conda-ocaml-ar.exe:"
   which conda-ocaml-ar.exe
 fi
 
