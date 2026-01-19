@@ -286,7 +286,9 @@ if [[ "${target_platform}" != "linux-"* ]] && [[ "${target_platform}" != "osx-"*
   # The wrapper is a native Windows exe placed before BUILD_PREFIX in PATH.
 
   REAL_AR=$(command -v conda-ocaml-ar.exe)
-  REAL_AR_WIN=$(cygpath -w "${REAL_AR}" 2>/dev/null || echo "${REAL_AR}")
+  # Use forward slashes - Windows APIs accept them and it avoids C escape issues
+  # Convert /d/path to D:/path format
+  REAL_AR_WIN=$(echo "${REAL_AR}" | sed 's|^/\([a-zA-Z]\)/|\1:/|')
   echo "Creating ar wrapper to handle false-positive exit codes"
   echo "Real conda-ocaml-ar.exe: ${REAL_AR}"
   echo "Real ar (Windows path): ${REAL_AR_WIN}"
@@ -338,9 +340,8 @@ int main(int argc, char *argv[]) {
 WRAPPER_C_EOF
 
   # Substitute the real ar path into the source
-  # Need to escape backslashes for C string
-  REAL_AR_C_ESCAPED=$(echo "${REAL_AR_WIN}" | sed 's/\\/\\\\/g')
-  sed -i "s|REAL_AR_PATH_PLACEHOLDER|${REAL_AR_C_ESCAPED}|" "${SRC_DIR}/.ar_wrapper/ar_wrapper.c"
+  # Using forward slashes so no escaping needed
+  sed -i "s|REAL_AR_PATH_PLACEHOLDER|${REAL_AR_WIN}|" "${SRC_DIR}/.ar_wrapper/ar_wrapper.c"
 
   echo "Compiling ar wrapper..."
   cat "${SRC_DIR}/.ar_wrapper/ar_wrapper.c"
