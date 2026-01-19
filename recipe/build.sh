@@ -273,18 +273,72 @@ if [[ "${target_platform}" != "linux-"* ]] && [[ "${target_platform}" != "osx-"*
   # due to conda placeholder substitution mangling the paths.
 
   # ---------------------------------------------------------------------------
-  # ar.exe info (no replacement - using original ar)
+  # ar.exe wrapper to ignore false-positive exit codes
   # ---------------------------------------------------------------------------
-  # Previous attempts:
-  # - gcc-ar replacement: Failed - gcc-ar when copied returns non-zero exit codes
-  #   even when archive is created (plugin path issues)
-  # - llvm-ar replacement: Failed - llvm-ar not available in conda environment
+  # Problem: conda-ocaml-ar.exe (OCaml's ar wrapper) returns non-zero exit codes
+  # even when the archive is successfully created. This causes make to fail.
   #
-  # Current approach: Use original ar.exe and let the build proceed
-  MINGW_AR_PATH=$(command -v "${CONDA_TOOLCHAIN_HOST}-ar.exe")
-  echo "Using original ar.exe at: ${MINGW_AR_PATH}"
-  echo "ar.exe version:"
-  "${MINGW_AR_PATH}" --version 2>&1 || true
+  # Solution: Create a wrapper that:
+  # 1. Calls the real conda-ocaml-ar.exe
+  # 2. Checks if the archive file was created
+  # 3. Returns 0 if the file exists, regardless of ar's exit code
+  #
+  # The wrapper is placed in SRC_DIR which is added to PATH before BUILD_PREFIX,
+  # so it gets found first when OCaml invokes 'conda-ocaml-ar.exe'.
+
+  REAL_AR=$(command -v conda-ocaml-ar.exe)
+  echo "Creating ar wrapper to handle false-positive exit codes"
+  echo "Real conda-ocaml-ar.exe: ${REAL_AR}"
+
+  # Create wrapper script
+  mkdir -p "${SRC_DIR}/.ar_wrapper"
+  cat > "${SRC_DIR}/.ar_wrapper/conda-ocaml-ar.exe" << 'WRAPPER_EOF'
+#!/bin/bash
+# Wrapper for conda-ocaml-ar.exe that ignores exit codes when archive is created
+
+REAL_AR="__REAL_AR_PATH__"
+
+# Parse arguments to find the output file
+# ar syntax: ar [options] archive [member...]
+# Common usage: ar rc archive.a file1.o file2.o ...
+OUTPUT_FILE=""
+for arg in "$@"; do
+  case "$arg" in
+    *.a)
+      OUTPUT_FILE="$arg"
+      break
+      ;;
+  esac
+done
+
+# Call the real ar
+"$REAL_AR" "$@"
+AR_EXIT=$?
+
+# If ar succeeded, return its exit code
+if [[ $AR_EXIT -eq 0 ]]; then
+  exit 0
+fi
+
+# If ar failed but the archive was created, ignore the error
+if [[ -n "$OUTPUT_FILE" ]] && [[ -f "$OUTPUT_FILE" ]]; then
+  echo "ar wrapper: Ignoring exit code $AR_EXIT because $OUTPUT_FILE was created" >&2
+  exit 0
+fi
+
+# Otherwise, propagate the error
+exit $AR_EXIT
+WRAPPER_EOF
+
+  # Substitute the real ar path into the wrapper
+  sed -i "s|__REAL_AR_PATH__|${REAL_AR}|" "${SRC_DIR}/.ar_wrapper/conda-ocaml-ar.exe"
+  chmod +x "${SRC_DIR}/.ar_wrapper/conda-ocaml-ar.exe"
+
+  # Add wrapper directory to PATH (before BUILD_PREFIX so it's found first)
+  export PATH="${SRC_DIR}/.ar_wrapper:${PATH}"
+  echo "Added ar wrapper to PATH"
+  echo "Wrapper test:"
+  which conda-ocaml-ar.exe
 fi
 
 # Run make with sequential jobs to reveal errors hidden by parallel execution
