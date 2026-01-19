@@ -383,10 +383,14 @@ WRAPPER_C_EOF
   done
 
   # Add wrapper directory to PATH (before BUILD_PREFIX so it's found first)
-  # Use pwd to get clean path instead of SRC_DIR which may have mixed formats
-  WRAPPER_DIR="$(pwd)/.ar_wrapper"
-  export PATH="${WRAPPER_DIR}:${PATH}"
-  echo "Added wrapper directory to PATH: ${WRAPPER_DIR}"
+  # CRITICAL: On Windows, PATH uses semicolon (;) separator, not colon (:)
+  # If we use colon with D:/path format, the colon is interpreted as separator
+  # splitting "D:/bld/..." into "D" and "/bld/..." which breaks everything!
+  #
+  # Solution: Convert to Windows format and use semicolon separator
+  WRAPPER_DIR_WIN=$(cygpath -w "$(pwd)/.ar_wrapper" 2>/dev/null | sed 's|\\|/|g')
+  export PATH="${WRAPPER_DIR_WIN};${PATH}"
+  echo "Added wrapper directory to PATH (Windows format): ${WRAPPER_DIR_WIN}"
   echo "Contents of wrapper directory:"
   ls -la ".ar_wrapper/"
   echo "Testing which finds wrapper versions:"
