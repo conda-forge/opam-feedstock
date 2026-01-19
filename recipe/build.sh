@@ -371,13 +371,26 @@ WRAPPER_C_EOF
     exit 1
   fi
 
+  # Also create symlinks for other OCaml tools so Dune can find them
+  # Dune searches PATH for conda-ocaml-cc.exe but fails to find it
+  # Creating symlinks in our wrapper directory ensures Dune finds them
+  for tool in conda-ocaml-cc.exe conda-ocaml-as.exe; do
+    REAL_TOOL=$(command -v "${tool}")
+    if [[ -n "${REAL_TOOL}" ]] && [[ -f "${REAL_TOOL}" ]]; then
+      ln -sf "${REAL_TOOL}" ".ar_wrapper/${tool}"
+      echo "Created symlink for ${tool}: .ar_wrapper/${tool} -> ${REAL_TOOL}"
+    fi
+  done
+
   # Add wrapper directory to PATH (before BUILD_PREFIX so it's found first)
   # Use pwd to get clean path instead of SRC_DIR which may have mixed formats
   WRAPPER_DIR="$(pwd)/.ar_wrapper"
   export PATH="${WRAPPER_DIR}:${PATH}"
-  echo "Added ar wrapper to PATH: ${WRAPPER_DIR}"
-  echo "Wrapper test - which conda-ocaml-ar.exe:"
-  which conda-ocaml-ar.exe
+  echo "Added wrapper directory to PATH: ${WRAPPER_DIR}"
+  echo "Contents of wrapper directory:"
+  ls -la ".ar_wrapper/"
+  echo "Testing which finds wrapper versions:"
+  which conda-ocaml-ar.exe conda-ocaml-cc.exe conda-ocaml-as.exe 2>/dev/null || true
 fi
 
 # Run make with sequential jobs to reveal errors hidden by parallel execution
