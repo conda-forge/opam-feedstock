@@ -11,9 +11,9 @@ echo   conda activate "${PREFIX}"                     >> conda_build.sh
 echo   conda activate --stack "${BUILD_PREFIX}"       >> conda_build.sh
 echo fi                                               >> conda_build.sh
 echo CONDA_PREFIX=${CONDA_PREFIX//\\//}               >> conda_build.sh
-echo export _PREFIX_=%_PREFIX_%                       >> conda_build.sh
-echo export _BUILD_PREFIX_=%_BUILD_PREFIX_%           >> conda_build.sh
-echo export _SRC_DIR_=%_SRC_DIR_%                     >> conda_build.sh
+echo export _PREFIX_=!_PREFIX_!                       >> conda_build.sh
+echo export _BUILD_PREFIX_=!_BUILD_PREFIX_!           >> conda_build.sh
+echo export _SRC_DIR_=!_SRC_DIR_!                     >> conda_build.sh
 type "%RECIPE_DIR%\build.sh"                          >> conda_build.sh
 
 :: Convert backslashes using delayed expansion to avoid issues with unexpanded %VAR% placeholders
