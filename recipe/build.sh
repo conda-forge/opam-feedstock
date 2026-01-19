@@ -303,6 +303,7 @@ if [[ "${target_platform}" != "linux-"* ]] && [[ "${target_platform}" != "osx-"*
 #include <string.h>
 #include <process.h>
 #include <io.h>
+#include <errno.h>
 
 int main(int argc, char *argv[]) {
     // Find the output file (first .a argument)
@@ -320,21 +321,34 @@ int main(int argc, char *argv[]) {
     // Note: REAL_AR_PATH is substituted during build
     const char *real_ar = "REAL_AR_PATH_PLACEHOLDER";
 
+    // Debug: show what we're calling
+    fprintf(stderr, "ar_wrapper: calling real ar: %s\n", real_ar);
+    fprintf(stderr, "ar_wrapper: output file: %s\n", output_file ? output_file : "(none)");
+
     // Call the real ar using spawnvp
     int result = _spawnvp(_P_WAIT, real_ar, (const char * const *)argv);
+
+    fprintf(stderr, "ar_wrapper: spawn returned %d (errno=%d)\n", result, errno);
 
     // If ar succeeded, return its exit code
     if (result == 0) {
         return 0;
     }
 
+    // If spawn failed to even start the process
+    if (result == -1) {
+        fprintf(stderr, "ar_wrapper: spawn FAILED, errno=%d\n", errno);
+        return 1;
+    }
+
     // If ar failed but the archive was created, ignore the error
     if (output_file != NULL && _access(output_file, 0) == 0) {
-        fprintf(stderr, "ar wrapper: Ignoring exit code %d because %s was created\n", result, output_file);
+        fprintf(stderr, "ar_wrapper: Ignoring exit code %d because %s was created\n", result, output_file);
         return 0;
     }
 
     // Otherwise, propagate the error
+    fprintf(stderr, "ar_wrapper: propagating error %d\n", result);
     return result;
 }
 WRAPPER_C_EOF
