@@ -383,14 +383,10 @@ WRAPPER_C_EOF
   done
 
   # Add wrapper directory to PATH (before BUILD_PREFIX so it's found first)
-  # CRITICAL: On Windows, PATH uses semicolon (;) separator, not colon (:)
-  # If we use colon with D:/path format, the colon is interpreted as separator
-  # splitting "D:/bld/..." into "D" and "/bld/..." which breaks everything!
-  #
-  # Solution: Convert to Windows format and use semicolon separator
-  WRAPPER_DIR_WIN=$(cygpath -w "$(pwd)/.ar_wrapper" 2>/dev/null | sed 's|\\|/|g')
-  export PATH="${WRAPPER_DIR_WIN};${PATH}"
-  echo "Added wrapper directory to PATH (Windows format): ${WRAPPER_DIR_WIN}"
+  # Use SRC_DIR from conda-build environment (already correct format)
+  WRAPPER_DIR="${SRC_DIR}/.ar_wrapper"
+  export PATH="${WRAPPER_DIR}:${PATH}"
+  echo "Added wrapper directory to PATH: ${WRAPPER_DIR}"
   echo "Contents of wrapper directory:"
   ls -la ".ar_wrapper/"
   echo "Testing which finds wrapper versions:"
