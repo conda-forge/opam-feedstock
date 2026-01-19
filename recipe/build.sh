@@ -248,25 +248,31 @@ if [[ "${target_platform}" != "linux-"* ]] && [[ "${target_platform}" != "osx-"*
   echo "_BUILD_PREFIX_=${_BUILD_PREFIX_:-unset}"
 
   # Use _BUILD_PREFIX (Unix /c/... format) if available, convert to Windows
-  # CRITICAL: Don't use cygpath - it substitutes %BUILD_PREFIX% placeholder!
-  # Manual conversion: /d/path -> D:/path (mixed Windows format with forward slashes)
+  # CRITICAL: Don't use cygpath or echo - they substitute %BUILD_PREFIX% placeholder!
+  # Manual conversion: /d/path -> D:/path using bash string manipulation only
   if [[ -n "${_BUILD_PREFIX:-}" ]]; then
     GCC_PATH_UNIX="${_BUILD_PREFIX}/Library/bin/${CONDA_TOOLCHAIN_HOST}-gcc.exe"
-    # Convert /d/... to D:/... format manually
-    GCC_WIN_PATH=$(echo "$GCC_PATH_UNIX" | sed 's|^/\([a-z]\)/|\U\1:/|')
-    echo "Using _BUILD_PREFIX: ${GCC_PATH_UNIX} -> ${GCC_WIN_PATH}"
+    # Convert /d/... to D:/... format: extract drive letter and uppercase it
+    DRIVE_LETTER="${GCC_PATH_UNIX:1:1}"  # Extract 'd' from '/d/...'
+    DRIVE_LETTER="${DRIVE_LETTER^^}"     # Uppercase to 'D'
+    REST_OF_PATH="${GCC_PATH_UNIX:2}"    # Everything after '/d'
+    GCC_WIN_PATH="${DRIVE_LETTER}:${REST_OF_PATH}"
+    printf "Using _BUILD_PREFIX: %s -> %s\n" "$GCC_PATH_UNIX" "$GCC_WIN_PATH"
   elif [[ -n "${_BUILD_PREFIX_:-}" ]]; then
     # _BUILD_PREFIX_ already has C:/... format, just use it
     GCC_WIN_PATH="${_BUILD_PREFIX_}/Library/bin/${CONDA_TOOLCHAIN_HOST}-gcc.exe"
-    echo "Using _BUILD_PREFIX_: ${GCC_WIN_PATH}"
+    printf "Using _BUILD_PREFIX_: %s\n" "$GCC_WIN_PATH"
   else
     # Fallback: use command -v and convert manually
     GCC_BASH_PATH=$(command -v "${CONDA_TOOLCHAIN_HOST}-gcc.exe")
-    GCC_WIN_PATH=$(echo "$GCC_BASH_PATH" | sed 's|^/\([a-z]\)/|\U\1:/|')
-    echo "Using command -v fallback: ${GCC_BASH_PATH} -> ${GCC_WIN_PATH}"
+    DRIVE_LETTER="${GCC_BASH_PATH:1:1}"
+    DRIVE_LETTER="${DRIVE_LETTER^^}"
+    REST_OF_PATH="${GCC_BASH_PATH:2}"
+    GCC_WIN_PATH="${DRIVE_LETTER}:${REST_OF_PATH}"
+    printf "Using command -v fallback: %s -> %s\n" "$GCC_BASH_PATH" "$GCC_WIN_PATH"
   fi
 
-  echo "GCC path for dune-workspace: ${GCC_WIN_PATH}"
+  printf "GCC path for dune-workspace: %s\n" "$GCC_WIN_PATH"
 
   cat > dune-workspace <<EOF
 (lang dune 2.8)
