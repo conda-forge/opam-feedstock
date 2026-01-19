@@ -267,53 +267,10 @@ if [[ "${target_platform}" != "linux-"* ]] && [[ "${target_platform}" != "osx-"*
   fi
   echo "C compiler verified in PATH: $(command -v "${CONDA_TOOLCHAIN_HOST}-gcc.exe")"
 
-  # Create dune-workspace file to explicitly configure C compiler for Windows
-  # This tells dune exactly where to find gcc without relying on PATH search
-  #
-  # CRITICAL: BUILD_PREFIX contains literal "%BUILD_PREFIX%" placeholder on Windows!
-  # But _BUILD_PREFIX (no trailing underscore) has /c/... Unix format
-  # And _BUILD_PREFIX_ has C:/... Windows format
-  # Try both to find one that works
-  echo "=== Debugging prefix variables ==="
-  echo "BUILD_PREFIX=${BUILD_PREFIX}"
-  echo "_BUILD_PREFIX=${_BUILD_PREFIX:-unset}"
-  echo "_BUILD_PREFIX_=${_BUILD_PREFIX_:-unset}"
-
-  # CRITICAL WORKAROUND: conda/rattler-build hooks into ALL bash output commands
-  # (echo, printf, cat, etc.) and substitutes expanded paths back to %BUILD_PREFIX%
-  # placeholder. This breaks dune-workspace parsing.
-  #
-  # Solution: Write template to file first, then use sed -i to replace placeholder
-  # with real path in-place. sed -i writes binary data, bypassing the hook.
-
-  cat > dune-workspace <<'DUNE_EOF'
-(lang dune 2.8)
-(context
- (default
-  (name default)
-  (toolchain
-   (c "PLACEHOLDER_GCC_PATH"))))
-DUNE_EOF
-
-  # Now replace PLACEHOLDER_GCC_PATH with actual path using sed -i
-  # _BUILD_PREFIX has Unix /d/bld/... format, convert to D:/bld/... for Windows
-  if [[ -n "${_BUILD_PREFIX:-}" ]]; then
-    # Extract components without storing in variables (to avoid placeholder substitution)
-    # sed -i writes binary, not going through bash output hooks
-    \sed -i "s|PLACEHOLDER_GCC_PATH|${_BUILD_PREFIX}/Library/bin/${CONDA_TOOLCHAIN_HOST}-gcc.exe|" dune-workspace
-    # Now fix the /d/ prefix to D: using manual sed (no \U in sed, do per-letter)
-    \sed -i 's|"/d/|"D:/|g; s|"/c/|"C:/|g' dune-workspace
-  elif [[ -n "${_BUILD_PREFIX_:-}" ]]; then
-    \sed -i "s|PLACEHOLDER_GCC_PATH|${_BUILD_PREFIX_}/Library/bin/${CONDA_TOOLCHAIN_HOST}-gcc.exe|" dune-workspace
-  else
-    GCC_BASH_PATH=$(command -v "${CONDA_TOOLCHAIN_HOST}-gcc.exe")
-    \sed -i "s|PLACEHOLDER_GCC_PATH|${GCC_BASH_PATH}|" dune-workspace
-    \sed -i 's|"/d/|"D:/|g; s|"/c/|"C:/|g' dune-workspace
-  fi
-
-  echo "Created dune-workspace with explicit C compiler path:"
-  # Use head instead of cat to avoid placeholder substitution on output
-  head -20 dune-workspace
+  # NOTE: dune-workspace workaround REMOVED
+  # OCaml _3 now has conda-ocaml-cc.exe wrapper which Dune finds via ocamlc -config.
+  # The previous dune-workspace code was causing "Atom or quoted string expected" errors
+  # due to conda placeholder substitution mangling the paths.
 
   # ---------------------------------------------------------------------------
   # ar.exe info (no replacement - using original ar)
