@@ -420,17 +420,17 @@ WRAPPER_C_EOF
   export PATH="${WRAPPER_DIR}:${PATH}"
   echo "Added wrapper directory to PATH: ${WRAPPER_DIR}"
 
-  # Copy symlinks to BUILD_PREFIX/bin where Dune will find them (already in PATH)
+  # Copy symlinks to BUILD_PREFIX/Library/bin where Dune will find them (already in PATH)
   # This avoids PATH parsing issues with Dune (Windows exe that expects semicolon-separated paths)
-  echo "DEBUG: Checking if ${ACTUAL_BUILD_PREFIX}/bin exists..."
-  ls -ld "${ACTUAL_BUILD_PREFIX}/bin" || echo "NOT FOUND"
+  echo "DEBUG: Checking if ${ACTUAL_BUILD_PREFIX}/Library/bin exists..."
+  ls -ld "${ACTUAL_BUILD_PREFIX}/Library/bin" || echo "NOT FOUND"
   echo "DEBUG: Contents of actual build prefix:"
   ls -la "${ACTUAL_BUILD_PREFIX}/" | head -10
 
-  # Use ACTUAL_BUILD_PREFIX (Windows D:/path format discovered from file system)
-  cp -f ".ar_wrapper/conda-ocaml-cc.exe" "${ACTUAL_BUILD_PREFIX}/bin/"
-  cp -f ".ar_wrapper/conda-ocaml-as.exe" "${ACTUAL_BUILD_PREFIX}/bin/"
-  echo "Copied wrapper symlinks to ${ACTUAL_BUILD_PREFIX}/bin for Dune to find"
+  # Use ACTUAL_BUILD_PREFIX/Library/bin (Windows path on Windows uses Library subdirectory)
+  cp -f ".ar_wrapper/conda-ocaml-cc.exe" "${ACTUAL_BUILD_PREFIX}/Library/bin/"
+  cp -f ".ar_wrapper/conda-ocaml-as.exe" "${ACTUAL_BUILD_PREFIX}/Library/bin/"
+  echo "Copied wrapper symlinks to ${ACTUAL_BUILD_PREFIX}/Library/bin for Dune to find"
   echo "Contents of wrapper directory:"
   ls -la ".ar_wrapper/"
   echo "Testing which finds wrapper versions:"
