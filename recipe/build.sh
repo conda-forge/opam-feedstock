@@ -27,9 +27,17 @@ else
   # Dune's Path.of_filename_relative_to_initial_cwd uses Filename.is_relative to check paths.
   # On Windows, /d/xxx is considered RELATIVE (no drive letter), so Dune prepends cwd → wrong path!
   # D:/xxx is correctly recognized as absolute, so Dune uses it directly.
-  export PATH="${_BUILD_PREFIX_}/Library/bin:${_BUILD_PREFIX_}/Library/mingw-w64/bin:${_BUILD_PREFIX_}/bin:${PATH}"
+  echo "=== Windows build setup - DEBUG ENVIRONMENT ==="
+  echo "DEBUG: Original conda variables:"
+  echo "  PREFIX=${PREFIX}"
+  echo "  BUILD_PREFIX=${BUILD_PREFIX}"
+  echo "  SRC_DIR=${SRC_DIR}"
+  echo "DEBUG: Exported from build.bat:"
+  echo "  _PREFIX_=${_PREFIX_}"
+  echo "  _BUILD_PREFIX_=${_BUILD_PREFIX_}"
+  echo "  _SRC_DIR_=${_SRC_DIR_}"
 
-  echo "=== Windows build setup ==="
+  export PATH="${_BUILD_PREFIX_}/Library/bin:${_BUILD_PREFIX_}/Library/mingw-w64/bin:${_BUILD_PREFIX_}/bin:${PATH}"
   echo "PATH updated with OCaml and gcc directories"
 
   # CRITICAL FIX for dune.exe C compiler discovery:
