@@ -362,9 +362,24 @@ int main(int argc, char *argv[]) {
     // Debug: show what we're calling
     fprintf(stderr, "ar_wrapper: calling real ar: %s\n", real_ar);
     fprintf(stderr, "ar_wrapper: output file: %s\n", output_file ? output_file : "(none)");
+    fprintf(stderr, "ar_wrapper: argc=%d, argv[0]=%s\n", argc, argv[0]);
 
-    // Call the real ar using spawnvp
-    int result = _spawnvp(_P_WAIT, real_ar, (const char * const *)argv);
+    // Create new argv with real_ar as argv[0]
+    // This is needed because argv[0] contains our wrapper's name, not the real ar
+    const char **new_argv = (const char **)malloc((argc + 1) * sizeof(char *));
+    if (!new_argv) {
+        fprintf(stderr, "ar_wrapper: malloc failed\n");
+        return 1;
+    }
+    new_argv[0] = real_ar;  // Set argv[0] to the real ar path
+    for (int i = 1; i < argc; i++) {
+        new_argv[i] = argv[i];  // Copy remaining arguments
+    }
+    new_argv[argc] = NULL;  // NULL-terminate for _spawnv
+
+    // Call the real ar using _spawnv (not _spawnvp) since we have a full path
+    int result = _spawnv(_P_WAIT, real_ar, new_argv);
+    free(new_argv);
 
     fprintf(stderr, "ar_wrapper: spawn returned %d (errno=%d)\n", result, errno);
 
