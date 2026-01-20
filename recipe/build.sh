@@ -366,10 +366,44 @@ if [[ "${target_platform}" != "linux-"* ]] && [[ "${target_platform}" != "osx-"*
   fi
   echo "C compiler verified in PATH: $(command -v "${CONDA_TOOLCHAIN_HOST}-gcc.exe")"
 
-  # NOTE: dune-workspace workaround REMOVED
-  # OCaml _3 now has conda-ocaml-cc.exe wrapper which Dune finds via ocamlc -config.
-  # The previous dune-workspace code was causing "Atom or quoted string expected" errors
-  # due to conda placeholder substitution mangling the paths.
+  # ---------------------------------------------------------------------------
+  # dune-workspace to tell Dune where to find conda-ocaml-cc.exe
+  # ---------------------------------------------------------------------------
+  # Problem: Dune searches PATH for the C compiler reported by ocamlc -config,
+  # but it needs Windows-format paths (D:/...) not MSYS2 format (/d/...).
+  #
+  # Solution: Use dune-workspace (binaries ...) to explicitly map conda-ocaml-cc.exe
+  # to its full Windows path. This bypasses Dune's PATH search entirely.
+  #
+  # CRITICAL: Must use Windows D:/... format, not MSYS2 /d/... format.
+  # Dune is a native Windows binary and doesn't understand MSYS2 paths.
+
+  # Find conda-ocaml-cc.exe in MSYS2 format
+  CC_MSYS=$(command -v conda-ocaml-cc.exe)
+  if [[ -z "${CC_MSYS}" ]]; then
+    echo "ERROR: conda-ocaml-cc.exe not found in PATH"
+    exit 1
+  fi
+
+  # Convert to Windows format using cygpath
+  CC_WIN=$(cygpath -m "${CC_MSYS}")
+
+  echo "Creating dune-workspace with C compiler path:"
+  echo "  MSYS2 path: ${CC_MSYS}"
+  echo "  Windows path: ${CC_WIN}"
+
+  # Create dune-workspace with explicit binary mapping
+  cat > dune-workspace << DUNE_WS_EOF
+(lang dune 3.0)
+
+(context
+ (default
+  (env
+   (_ (binaries (${CC_WIN} as conda-ocaml-cc.exe))))))
+DUNE_WS_EOF
+
+  echo "dune-workspace created:"
+  cat dune-workspace
 
   # ---------------------------------------------------------------------------
   # ar.exe wrapper to ignore false-positive exit codes
@@ -553,46 +587,6 @@ fi
 # Also pass DUNE_ARGS for verbose and sequential execution
 export DUNE_CONFIG__JOBS=1
 echo "Set DUNE_CONFIG__JOBS=1 to force sequential build (reveals hidden errors)"
-
-# Run make - on Windows, we need special handling for Dune (Windows .exe)
-# Dune reads PATH and needs Windows format (D:/...; semicolons)
-# But make needs MSYS2 format (/d/...:/usr/bin colons)
-#
-# Solution: Create a wrapper in .ar_wrapper/ directory (NOT in source root to avoid Dune parsing it)
-if [[ -n "${WIN_PATH_FOR_DUNE}" ]]; then
-  # Windows build: Create dune wrapper that sets Windows PATH
-  echo "=== Creating Dune wrapper for Windows PATH ==="
-
-  # Find the real dune.exe location
-  REAL_DUNE=$(command -v dune.exe || echo "dune.exe")
-
-  # Create wrapper in .ar_wrapper directory to avoid Dune trying to parse it as a dune config file
-  cat > .ar_wrapper/dune << 'DUNE_WRAPPER_EOF'
-#!/bin/bash
-# Wrapper to give Dune (Windows .exe) a Windows-format PATH
-# while keeping MSYS2 PATH for make and bash scripts
-
-# Import the Windows PATH that was prepared earlier
-if [[ -n "${WIN_PATH_FOR_DUNE}" ]]; then
-  export PATH="${WIN_PATH_FOR_DUNE}"
-fi
-
-# Execute the real Dune - find it in PATH excluding current directory
-REAL_DUNE=$(PATH="${PATH#*:}" command -v dune.exe 2>/dev/null || command -v dune.exe)
-exec "${REAL_DUNE}" "$@"
-DUNE_WRAPPER_EOF
-
-  chmod +x .ar_wrapper/dune
-
-  # Prepend .ar_wrapper to PATH so make finds our wrapper before real dune.exe
-  # This directory is already in PATH from earlier (line 510), but ensure it's first
-  export PATH="${WRAPPER_DIR_MSYS}:${PATH}"
-
-  echo "Dune wrapper created at: ${WRAPPER_DIR_MSYS}/dune"
-  echo "Wrapper will set PATH to Windows format when invoking real dune.exe"
-  echo "Current PATH (first 3 entries):"
-  echo "$PATH" | tr ':' '\n' | head -3 | sed 's/^/    /'
-fi
 
 echo "=== Running make ==="
 if ! make DUNE_ARGS="--display=verbose -j 1"; then
