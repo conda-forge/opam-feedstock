@@ -64,6 +64,57 @@ else
   export PATH="${ACTUAL_BUILD_PREFIX}/Library/bin:${ACTUAL_BUILD_PREFIX}/Library/mingw-w64/bin:${ACTUAL_BUILD_PREFIX}/bin:${PATH}"
   echo "PATH updated with OCaml and gcc directories (using ACTUAL_BUILD_PREFIX)"
 
+  # ===========================================================================
+  # CRITICAL FIX: Convert ENTIRE PATH to Windows format for Dune
+  # ===========================================================================
+  # Problem: Dune is a native Windows binary that reads PATH literally.
+  # MSYS2 PATH format: /d/bld/.../bin:/d/bld/.../mingw-w64/bin (colon-separated, /d/ style)
+  # Windows PATH format: D:/bld/.../bin;D:/bld/.../mingw-w64/bin (semicolon-separated, D:/ style)
+  #
+  # When Dune reads PATH with MSYS2 format paths, it can't find executables because:
+  # 1. Windows APIs don't understand /d/bld/... paths
+  # 2. Splitting on ':' breaks drive letters (D: becomes just D)
+  #
+  # Solution: Convert all PATH entries from MSYS2 to Windows format using cygpath
+  echo "Converting PATH to Windows format for Dune..."
+  ORIGINAL_PATH="$PATH"
+  WIN_PATH=""
+
+  # Save and restore IFS to avoid affecting rest of script
+  OLD_IFS="$IFS"
+  IFS=':'
+  for entry in $PATH; do
+    # Skip empty entries
+    [[ -z "$entry" ]] && continue
+
+    # Convert MSYS2 path to Windows format
+    # cygpath -w converts /d/bld/... to D:\bld\...
+    # We use forward slashes (D:/bld/...) which Windows also accepts
+    if [[ "$entry" == /[a-zA-Z]/* ]]; then
+      # MSYS2 path like /d/bld/... or /D/bld/...
+      win_entry=$(cygpath -m "$entry" 2>/dev/null) || win_entry="$entry"
+    elif [[ "$entry" == /* ]]; then
+      # Other Unix-style paths (e.g., /usr/bin) - try to convert
+      win_entry=$(cygpath -m "$entry" 2>/dev/null) || win_entry="$entry"
+    else
+      # Already Windows format or relative path
+      win_entry="$entry"
+    fi
+
+    # Build semicolon-separated Windows PATH
+    if [[ -z "$WIN_PATH" ]]; then
+      WIN_PATH="$win_entry"
+    else
+      WIN_PATH="${WIN_PATH};${win_entry}"
+    fi
+  done
+  IFS="$OLD_IFS"
+
+  export PATH="$WIN_PATH"
+  echo "PATH converted to Windows format (semicolon-separated, D:/ style)"
+  echo "  First 3 entries:"
+  echo "$PATH" | tr ';' '\n' | head -3 | sed 's/^/    /'
+
   # CRITICAL FIX for dune.exe C compiler discovery:
   # Dune is a Windows native .exe that reads PATH literally without MSYS2 conversion.
   # When PATH contains /d/bld/..., Windows executables cannot interpret it.
@@ -266,12 +317,12 @@ if [[ "${target_platform}" != "linux-"* ]] && [[ "${target_platform}" != "osx-"*
   "${BUILD_PREFIX}/Library/bin/ocamlc.opt.exe" -config | grep -E "c_compiler|bytecomp_c|native_c|ccomp|asm"
   echo ""
   echo "=== DEBUG: PATH entries (first 10) ==="
-  echo "${PATH}" | tr ':' '\n' | head -10
+  # PATH is now semicolon-separated Windows format
+  echo "${PATH}" | tr ';' '\n' | head -10
   echo ""
-  echo "=== DEBUG: PATH in Windows format (what Dune sees) ==="
-  # Dune is a Windows exe - it sees PATH with ; separator
-  # Show what format the paths are in
-  for p in $(echo "${PATH}" | tr ':' '\n' | head -5); do
+  echo "=== DEBUG: Verifying PATH entries are Windows format (what Dune sees) ==="
+  # After conversion, all paths should be D:/... format
+  for p in $(echo "${PATH}" | tr ';' '\n' | head -5); do
     echo "  PATH entry: $p"
     if [[ -d "$p" ]]; then
       echo "    -> exists as directory"
@@ -437,8 +488,9 @@ WRAPPER_C_EOF
 
   # Add wrapper directory to PATH (before BUILD_PREFIX so it's found first)
   # Use ACTUAL_SRC_DIR (Windows D:/path format)
+  # NOTE: PATH is now semicolon-separated Windows format after earlier conversion
   WRAPPER_DIR="${ACTUAL_SRC_DIR}/.ar_wrapper"
-  export PATH="${WRAPPER_DIR}:${PATH}"
+  export PATH="${WRAPPER_DIR};${PATH}"
   echo "Added wrapper directory to PATH: ${WRAPPER_DIR}"
 
   # Copy symlinks to BUILD_PREFIX/Library/bin where Dune will find them (already in PATH)
