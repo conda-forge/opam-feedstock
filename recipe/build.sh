@@ -394,7 +394,7 @@ if [[ "${target_platform}" != "linux-"* ]] && [[ "${target_platform}" != "osx-"*
 
   # Create dune-workspace with explicit binary mapping
   cat > dune-workspace << DUNE_WS_EOF
-(lang dune 3.0)
+(lang dune 3.2)
 
 (context
  (default
