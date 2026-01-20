@@ -378,15 +378,16 @@ if [[ "${target_platform}" != "linux-"* ]] && [[ "${target_platform}" != "osx-"*
   # CRITICAL: Must use Windows D:/... format, not MSYS2 /d/... format.
   # Dune is a native Windows binary and doesn't understand MSYS2 paths.
 
-  # Find conda-ocaml-cc.exe in MSYS2 format
-  CC_MSYS=$(command -v conda-ocaml-cc.exe)
-  if [[ -z "${CC_MSYS}" ]]; then
-    echo "ERROR: conda-ocaml-cc.exe not found in PATH"
+  # Construct conda-ocaml-cc.exe path using ACTUAL_BUILD_PREFIX (Windows D:/path format)
+  # Using ACTUAL_BUILD_PREFIX avoids unexpanded %BUILD_PREFIX% variables from conda/rattler-build
+  CC_WIN="${ACTUAL_BUILD_PREFIX}/Library/bin/conda-ocaml-cc.exe"
+
+  # Verify it exists in MSYS2 format
+  CC_MSYS="${ACTUAL_BUILD_PREFIX_MSYS}/Library/bin/conda-ocaml-cc.exe"
+  if [[ ! -f "${CC_MSYS}" ]]; then
+    echo "ERROR: conda-ocaml-cc.exe not found at ${CC_MSYS}"
     exit 1
   fi
-
-  # Convert to Windows format using cygpath
-  CC_WIN=$(cygpath -m "${CC_MSYS}")
 
   echo "Creating dune-workspace with C compiler path:"
   echo "  MSYS2 path: ${CC_MSYS}"
