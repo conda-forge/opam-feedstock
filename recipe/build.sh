@@ -319,8 +319,8 @@ if [[ "${target_platform}" != "linux-"* ]] && [[ "${target_platform}" != "osx-"*
 
   REAL_AR=$(command -v conda-ocaml-ar.exe)
   # Use forward slashes - Windows APIs accept them and it avoids C escape issues
-  # Convert /d/path to D:/path format
-  REAL_AR_WIN=$(echo "${REAL_AR}" | sed 's|^/\([a-zA-Z]\)/|\1:/|')
+  # Convert /d/path to D:/path format (MUST uppercase drive letter to match ACTUAL_BUILD_PREFIX)
+  REAL_AR_WIN=$(echo "${REAL_AR}" | sed 's|^/\([a-z]\)/|\U\1:/|')
 
   # CRITICAL: The wrapper will be installed as conda-ocaml-ar.exe, replacing the original.
   # We need the wrapper to call conda-ocaml-ar.exe.real (the saved original) instead.
