@@ -391,9 +391,14 @@ if [[ "${target_platform}" != "linux-"* ]] && [[ "${target_platform}" != "osx-"*
 
   echo "Creating dune-workspace with C compiler path:"
   echo "  MSYS2 path: ${CC_MSYS}"
-  echo "  Windows path: ${CC_WIN}"
+  echo "  Windows path for dune-workspace: ${CC_WIN}"
+  echo "  DEBUG: Verifying ACTUAL_BUILD_PREFIX is expanded:"
+  echo "    ACTUAL_BUILD_PREFIX=${ACTUAL_BUILD_PREFIX}"
+  echo "    Should be D:/bld/... format, NOT %BUILD_PREFIX%"
 
   # Create dune-workspace with explicit binary mapping
+  # CRITICAL: Must use unquoted heredoc delimiter (DUNE_WS_EOF not 'DUNE_WS_EOF')
+  # so that ${CC_WIN} expands to the actual path, not literal "${CC_WIN}"
   cat > dune-workspace << DUNE_WS_EOF
 (lang dune 3.2)
 
@@ -405,6 +410,15 @@ DUNE_WS_EOF
 
   echo "dune-workspace created:"
   cat dune-workspace
+  echo ""
+  echo "Verifying dune-workspace does NOT contain %BUILD_PREFIX%:"
+  if grep -q '%BUILD_PREFIX%' dune-workspace; then
+    echo "ERROR: dune-workspace still contains unexpanded %BUILD_PREFIX% variable!"
+    echo "This means ACTUAL_BUILD_PREFIX was not set correctly."
+    exit 1
+  else
+    echo "OK: dune-workspace contains expanded path (D:/bld/... format)"
+  fi
 
   # ---------------------------------------------------------------------------
   # ar.exe wrapper to ignore false-positive exit codes
