@@ -429,7 +429,8 @@ WRAPPER_C_EOF
 
   # Use ACTUAL_BUILD_PREFIX/Library/bin (Windows path on Windows uses Library subdirectory)
   # Use -L flag to dereference symlinks and check existence first
-  for tool in conda-ocaml-cc.exe conda-ocaml-as.exe; do
+  # CRITICAL: Include conda-ocaml-ar.exe - this is our compiled wrapper that handles exit codes
+  for tool in conda-ocaml-ar.exe conda-ocaml-cc.exe conda-ocaml-as.exe; do
     if [[ -f ".ar_wrapper/${tool}" ]]; then
       cp -fL ".ar_wrapper/${tool}" "${ACTUAL_BUILD_PREFIX}/Library/bin/"
       echo "Copied ${tool} to ${ACTUAL_BUILD_PREFIX}/Library/bin"
