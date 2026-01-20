@@ -428,9 +428,16 @@ WRAPPER_C_EOF
   ls -la "${ACTUAL_BUILD_PREFIX}/" | head -10
 
   # Use ACTUAL_BUILD_PREFIX/Library/bin (Windows path on Windows uses Library subdirectory)
-  cp -f ".ar_wrapper/conda-ocaml-cc.exe" "${ACTUAL_BUILD_PREFIX}/Library/bin/"
-  cp -f ".ar_wrapper/conda-ocaml-as.exe" "${ACTUAL_BUILD_PREFIX}/Library/bin/"
-  echo "Copied wrapper symlinks to ${ACTUAL_BUILD_PREFIX}/Library/bin for Dune to find"
+  # Use -L flag to dereference symlinks and check existence first
+  for tool in conda-ocaml-cc.exe conda-ocaml-as.exe; do
+    if [[ -f ".ar_wrapper/${tool}" ]]; then
+      cp -fL ".ar_wrapper/${tool}" "${ACTUAL_BUILD_PREFIX}/Library/bin/"
+      echo "Copied ${tool} to ${ACTUAL_BUILD_PREFIX}/Library/bin"
+    else
+      echo "WARNING: .ar_wrapper/${tool} not found, skipping copy"
+    fi
+  done
+  echo "Finished copying wrapper symlinks to ${ACTUAL_BUILD_PREFIX}/Library/bin for Dune to find"
   echo "Contents of wrapper directory:"
   ls -la ".ar_wrapper/"
   echo "Testing which finds wrapper versions:"
