@@ -40,26 +40,29 @@ else
   echo "  pwd=$(pwd)"
   echo "  PWD=${PWD}"
 
-  # On Windows, conda/rattler-build sets PREFIX/BUILD_PREFIX as placeholders
-  # We need to find the actual paths. The build happens in a temp directory
-  # and BUILD_PREFIX/bin should exist. Let's find it using the file system.
+  # On Windows, conda/rattler-build sets PREFIX/BUILD_PREFIX as %VAR% placeholders
+  # that are meant to be expanded by Windows batch scripts, but we're in bash/MSYS2.
+  # We need to find and use the actual paths.
 
-  # SRC_DIR should be current directory
-  ACTUAL_SRC_DIR="$(pwd -W 2>/dev/null || cygpath -w "$(pwd)" 2>/dev/null || pwd)"
-  echo "DEBUG: ACTUAL_SRC_DIR=${ACTUAL_SRC_DIR}"
+  # Current directory is SRC_DIR (work directory)
+  # In rattler-build, BUILD_PREFIX is ../build_env relative to SRC_DIR
+  # Use realpath and convert /d/path to D:/path format for Windows tools like Dune
 
-  # BUILD_PREFIX should be ../build_env relative to work directory
-  # Let's check if it exists
-  if [ -d "../build_env" ]; then
-    ACTUAL_BUILD_PREFIX="$(cd ../build_env && (pwd -W 2>/dev/null || cygpath -w "$(pwd)" 2>/dev/null || pwd))"
-    echo "DEBUG: Found ACTUAL_BUILD_PREFIX=${ACTUAL_BUILD_PREFIX}"
-  else
-    echo "DEBUG: ../build_env not found, searching..."
-    find .. -maxdepth 2 -name "build_env" -type d 2>/dev/null | head -1
-  fi
+  ACTUAL_SRC_DIR_MSYS="$(pwd)"  # /d/bld/.../work
+  ACTUAL_BUILD_PREFIX_MSYS="$(realpath ../build_env)"  # /d/bld/.../build_env
 
-  export PATH="${_BUILD_PREFIX_}/Library/bin:${_BUILD_PREFIX_}/Library/mingw-w64/bin:${_BUILD_PREFIX_}/bin:${PATH}"
-  echo "PATH updated with OCaml and gcc directories"
+  # Convert MSYS2 /d/path to Windows D:/path format (lowercase drive letter to uppercase, add colon)
+  ACTUAL_SRC_DIR="$(echo "${ACTUAL_SRC_DIR_MSYS}" | sed 's|^/\([a-z]\)/|\U\1:/|')"
+  ACTUAL_BUILD_PREFIX="$(echo "${ACTUAL_BUILD_PREFIX_MSYS}" | sed 's|^/\([a-z]\)/|\U\1:/|')"
+
+  echo "DEBUG: ACTUAL_SRC_DIR_MSYS=${ACTUAL_SRC_DIR_MSYS}"
+  echo "DEBUG: ACTUAL_BUILD_PREFIX_MSYS=${ACTUAL_BUILD_PREFIX_MSYS}"
+  echo "DEBUG: ACTUAL_SRC_DIR=${ACTUAL_SRC_DIR} (Windows format)"
+  echo "DEBUG: ACTUAL_BUILD_PREFIX=${ACTUAL_BUILD_PREFIX} (Windows format)"
+
+  # Use ACTUAL_BUILD_PREFIX for PATH (Windows D:/path format for Dune)
+  export PATH="${ACTUAL_BUILD_PREFIX}/Library/bin:${ACTUAL_BUILD_PREFIX}/Library/mingw-w64/bin:${ACTUAL_BUILD_PREFIX}/bin:${PATH}"
+  echo "PATH updated with OCaml and gcc directories (using ACTUAL_BUILD_PREFIX)"
 
   # CRITICAL FIX for dune.exe C compiler discovery:
   # Dune is a Windows native .exe that reads PATH literally without MSYS2 conversion.
@@ -412,24 +415,22 @@ WRAPPER_C_EOF
   done
 
   # Add wrapper directory to PATH (before BUILD_PREFIX so it's found first)
-  # Use _SRC_DIR_ from build.bat (Windows format with forward slashes: D:/bld/...)
-  WRAPPER_DIR="${_SRC_DIR_}/.ar_wrapper"
+  # Use ACTUAL_SRC_DIR (Windows D:/path format)
+  WRAPPER_DIR="${ACTUAL_SRC_DIR}/.ar_wrapper"
   export PATH="${WRAPPER_DIR}:${PATH}"
   echo "Added wrapper directory to PATH: ${WRAPPER_DIR}"
 
   # Copy symlinks to BUILD_PREFIX/bin where Dune will find them (already in PATH)
   # This avoids PATH parsing issues with Dune (Windows exe that expects semicolon-separated paths)
-  echo "DEBUG: BUILD_PREFIX=${BUILD_PREFIX}"
-  echo "DEBUG: _BUILD_PREFIX_=${_BUILD_PREFIX_}"
-  echo "DEBUG: Checking if ${BUILD_PREFIX}/bin exists..."
-  ls -ld "${BUILD_PREFIX}/bin" || echo "NOT FOUND"
-  echo "DEBUG: Checking if ${_BUILD_PREFIX_}/bin exists..."
-  ls -ld "${_BUILD_PREFIX_}/bin" || echo "NOT FOUND"
+  echo "DEBUG: Checking if ${ACTUAL_BUILD_PREFIX}/bin exists..."
+  ls -ld "${ACTUAL_BUILD_PREFIX}/bin" || echo "NOT FOUND"
+  echo "DEBUG: Contents of actual build prefix:"
+  ls -la "${ACTUAL_BUILD_PREFIX}/" | head -10
 
-  # Use _BUILD_PREFIX_ which is exported from build.bat with Windows-format path
-  cp -f ".ar_wrapper/conda-ocaml-cc.exe" "${_BUILD_PREFIX_}/bin/"
-  cp -f ".ar_wrapper/conda-ocaml-as.exe" "${_BUILD_PREFIX_}/bin/"
-  echo "Copied wrapper symlinks to BUILD_PREFIX/bin for Dune to find"
+  # Use ACTUAL_BUILD_PREFIX (Windows D:/path format discovered from file system)
+  cp -f ".ar_wrapper/conda-ocaml-cc.exe" "${ACTUAL_BUILD_PREFIX}/bin/"
+  cp -f ".ar_wrapper/conda-ocaml-as.exe" "${ACTUAL_BUILD_PREFIX}/bin/"
+  echo "Copied wrapper symlinks to ${ACTUAL_BUILD_PREFIX}/bin for Dune to find"
   echo "Contents of wrapper directory:"
   ls -la ".ar_wrapper/"
   echo "Testing which finds wrapper versions:"
