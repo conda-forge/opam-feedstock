@@ -281,13 +281,13 @@ fi
 
 if [[ "${target_platform}" != "linux-"* ]] && [[ "${target_platform}" != "osx-"* ]]; then
   # ---------------------------------------------------------------------------
-  # Verify C compiler is available (PATH already set above)
+  # Verify C compiler is available (PATH is MSYS2 format by default)
   # ---------------------------------------------------------------------------
-  EXPECTED_CC=$(ocamlc -config | PATH="$MSYS2_PATH" grep "^c_compiler:" | PATH="$MSYS2_PATH" awk '{print $2}')
+  EXPECTED_CC=$(ocamlc -config | grep "^c_compiler:" | awk '{print $2}')
   echo "OCaml expects C compiler: ${EXPECTED_CC}"
 
-  if PATH="$MSYS2_PATH" command -v "${EXPECTED_CC}" &>/dev/null; then
-    echo "C compiler found: $(PATH="$MSYS2_PATH" command -v "${EXPECTED_CC}")"
+  if command -v "${EXPECTED_CC}" &>/dev/null; then
+    echo "C compiler found: $(command -v "${EXPECTED_CC}")"
   else
     echo "ERROR: ${EXPECTED_CC} not found in PATH"
     echo "PATH: ${PATH}"
@@ -554,18 +554,48 @@ fi
 export DUNE_CONFIG__JOBS=1
 echo "Set DUNE_CONFIG__JOBS=1 to force sequential build (reveals hidden errors)"
 
-# On Windows, pass Windows PATH to make so Dune can find compilers
-# On Linux/macOS, WIN_PATH_FOR_DUNE is not set, so PATH remains unchanged
+# Run make - on Windows, we need special handling for Dune (Windows .exe)
+# Dune reads PATH and needs Windows format (D:/...; semicolons)
+# But make needs MSYS2 format (/d/...:/usr/bin colons)
+#
+# Solution: Create a wrapper that make invokes instead of dune directly
 if [[ -n "${WIN_PATH_FOR_DUNE}" ]]; then
-  echo "=== Running make with Windows PATH for Dune ==="
-  if ! PATH="${WIN_PATH_FOR_DUNE}" make DUNE_ARGS="--display=verbose -j 1"; then
-    MAKE_FAILED=1
-  fi
-else
-  echo "=== Running make with native PATH ==="
-  if ! make DUNE_ARGS="--display=verbose -j 1"; then
-    MAKE_FAILED=1
-  fi
+  # Windows build: Create dune wrapper that sets Windows PATH
+  echo "=== Creating Dune wrapper for Windows PATH ==="
+
+  # Find the real dune.exe location
+  REAL_DUNE=$(command -v dune.exe || echo "dune.exe")
+
+  # Create wrapper executable named "dune" that will be found before real dune.exe
+  cat > dune << 'DUNE_WRAPPER_EOF'
+#!/bin/bash
+# Wrapper to give Dune (Windows .exe) a Windows-format PATH
+# while keeping MSYS2 PATH for make and bash scripts
+
+# Import the Windows PATH that was prepared earlier
+if [[ -n "${WIN_PATH_FOR_DUNE}" ]]; then
+  export PATH="${WIN_PATH_FOR_DUNE}"
+fi
+
+# Execute the real Dune - find it in PATH excluding current directory
+REAL_DUNE=$(PATH="${PATH#*:}" command -v dune.exe 2>/dev/null || command -v dune.exe)
+exec "${REAL_DUNE}" "$@"
+DUNE_WRAPPER_EOF
+
+  chmod +x dune
+
+  # Add current directory FIRST in PATH so make finds our wrapper before real dune
+  export PATH="$(pwd):${PATH}"
+
+  echo "Dune wrapper created at: $(pwd)/dune"
+  echo "Wrapper will set PATH to Windows format when invoking real dune.exe"
+  echo "Current PATH (first 3 entries):"
+  echo "$PATH" | tr ':' '\n' | head -3 | sed 's/^/    /'
+fi
+
+echo "=== Running make ==="
+if ! make DUNE_ARGS="--display=verbose -j 1"; then
+  MAKE_FAILED=1
 fi
 
 if [[ "${MAKE_FAILED}" == "1" ]]; then
@@ -603,9 +633,5 @@ if [[ "${MAKE_FAILED}" == "1" ]]; then
   exit 1
 fi
 
-# Run make install with same PATH strategy as build
-if [[ -n "${WIN_PATH_FOR_DUNE}" ]]; then
-  PATH="${WIN_PATH_FOR_DUNE}" make install
-else
-  make install
-fi
+# Run make install with MSYS2 PATH
+make install
