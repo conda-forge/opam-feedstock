@@ -321,9 +321,15 @@ if [[ "${target_platform}" != "linux-"* ]] && [[ "${target_platform}" != "osx-"*
   # Use forward slashes - Windows APIs accept them and it avoids C escape issues
   # Convert /d/path to D:/path format
   REAL_AR_WIN=$(echo "${REAL_AR}" | sed 's|^/\([a-zA-Z]\)/|\1:/|')
+
+  # CRITICAL: The wrapper will be installed as conda-ocaml-ar.exe, replacing the original.
+  # We need the wrapper to call conda-ocaml-ar.exe.real (the saved original) instead.
+  # Change the path from /conda-ocaml-ar.exe to /conda-ocaml-ar.exe.real
+  REAL_AR_WIN="${REAL_AR_WIN}.real"
+
   echo "Creating ar wrapper to handle false-positive exit codes"
   echo "Real conda-ocaml-ar.exe: ${REAL_AR}"
-  echo "Real ar (Windows path): ${REAL_AR_WIN}"
+  echo "Wrapper will call (Windows path): ${REAL_AR_WIN}"
 
   # Create wrapper directory
   mkdir -p ".ar_wrapper"
@@ -429,7 +435,18 @@ WRAPPER_C_EOF
 
   # Use ACTUAL_BUILD_PREFIX/Library/bin (Windows path on Windows uses Library subdirectory)
   # Use -L flag to dereference symlinks and check existence first
-  # CRITICAL: Include conda-ocaml-ar.exe - this is our compiled wrapper that handles exit codes
+  # CRITICAL FIX: For ar wrapper, we need to:
+  # 1. Save the real conda-ocaml-ar.exe with a different name (.real suffix)
+  # 2. Then install our wrapper as conda-ocaml-ar.exe
+  # This prevents the wrapper from calling itself (infinite loop)
+
+  # First, save the real ar if it exists and hasn't been saved yet
+  if [[ -f "${ACTUAL_BUILD_PREFIX}/Library/bin/conda-ocaml-ar.exe" ]] && [[ ! -f "${ACTUAL_BUILD_PREFIX}/Library/bin/conda-ocaml-ar.exe.real" ]]; then
+    mv "${ACTUAL_BUILD_PREFIX}/Library/bin/conda-ocaml-ar.exe" "${ACTUAL_BUILD_PREFIX}/Library/bin/conda-ocaml-ar.exe.real"
+    echo "Saved real conda-ocaml-ar.exe as conda-ocaml-ar.exe.real"
+  fi
+
+  # Now copy our wrapper and the other tools
   for tool in conda-ocaml-ar.exe conda-ocaml-cc.exe conda-ocaml-as.exe; do
     if [[ -f ".ar_wrapper/${tool}" ]]; then
       cp -fL ".ar_wrapper/${tool}" "${ACTUAL_BUILD_PREFIX}/Library/bin/"
