@@ -405,7 +405,7 @@ if [[ "${target_platform}" != "linux-"* ]] && [[ "${target_platform}" != "osx-"*
 (context
  (default
   (env
-   (_ (binaries (${CC_WIN} as conda-ocaml-cc.exe))))))
+   (_ (binaries (conda-ocaml-cc.exe ${CC_WIN}))))))
 DUNE_WS_EOF
 
   echo "dune-workspace created:"
