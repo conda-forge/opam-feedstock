@@ -558,7 +558,7 @@ echo "Set DUNE_CONFIG__JOBS=1 to force sequential build (reveals hidden errors)"
 # Dune reads PATH and needs Windows format (D:/...; semicolons)
 # But make needs MSYS2 format (/d/...:/usr/bin colons)
 #
-# Solution: Create a wrapper that make invokes instead of dune directly
+# Solution: Create a wrapper in .ar_wrapper/ directory (NOT in source root to avoid Dune parsing it)
 if [[ -n "${WIN_PATH_FOR_DUNE}" ]]; then
   # Windows build: Create dune wrapper that sets Windows PATH
   echo "=== Creating Dune wrapper for Windows PATH ==="
@@ -566,8 +566,8 @@ if [[ -n "${WIN_PATH_FOR_DUNE}" ]]; then
   # Find the real dune.exe location
   REAL_DUNE=$(command -v dune.exe || echo "dune.exe")
 
-  # Create wrapper executable named "dune" that will be found before real dune.exe
-  cat > dune << 'DUNE_WRAPPER_EOF'
+  # Create wrapper in .ar_wrapper directory to avoid Dune trying to parse it as a dune config file
+  cat > .ar_wrapper/dune << 'DUNE_WRAPPER_EOF'
 #!/bin/bash
 # Wrapper to give Dune (Windows .exe) a Windows-format PATH
 # while keeping MSYS2 PATH for make and bash scripts
@@ -582,12 +582,13 @@ REAL_DUNE=$(PATH="${PATH#*:}" command -v dune.exe 2>/dev/null || command -v dune
 exec "${REAL_DUNE}" "$@"
 DUNE_WRAPPER_EOF
 
-  chmod +x dune
+  chmod +x .ar_wrapper/dune
 
-  # Add current directory FIRST in PATH so make finds our wrapper before real dune
-  export PATH="$(pwd):${PATH}"
+  # Prepend .ar_wrapper to PATH so make finds our wrapper before real dune.exe
+  # This directory is already in PATH from earlier (line 510), but ensure it's first
+  export PATH="${WRAPPER_DIR_MSYS}:${PATH}"
 
-  echo "Dune wrapper created at: $(pwd)/dune"
+  echo "Dune wrapper created at: ${WRAPPER_DIR_MSYS}/dune"
   echo "Wrapper will set PATH to Windows format when invoking real dune.exe"
   echo "Current PATH (first 3 entries):"
   echo "$PATH" | tr ':' '\n' | head -3 | sed 's/^/    /'
