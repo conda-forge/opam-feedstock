@@ -36,6 +36,27 @@ else
   echo "  _PREFIX_=${_PREFIX_}"
   echo "  _BUILD_PREFIX_=${_BUILD_PREFIX_}"
   echo "  _SRC_DIR_=${_SRC_DIR_}"
+  echo "DEBUG: Current working directory:"
+  echo "  pwd=$(pwd)"
+  echo "  PWD=${PWD}"
+
+  # On Windows, conda/rattler-build sets PREFIX/BUILD_PREFIX as placeholders
+  # We need to find the actual paths. The build happens in a temp directory
+  # and BUILD_PREFIX/bin should exist. Let's find it using the file system.
+
+  # SRC_DIR should be current directory
+  ACTUAL_SRC_DIR="$(pwd -W 2>/dev/null || cygpath -w "$(pwd)" 2>/dev/null || pwd)"
+  echo "DEBUG: ACTUAL_SRC_DIR=${ACTUAL_SRC_DIR}"
+
+  # BUILD_PREFIX should be ../build_env relative to work directory
+  # Let's check if it exists
+  if [ -d "../build_env" ]; then
+    ACTUAL_BUILD_PREFIX="$(cd ../build_env && (pwd -W 2>/dev/null || cygpath -w "$(pwd)" 2>/dev/null || pwd))"
+    echo "DEBUG: Found ACTUAL_BUILD_PREFIX=${ACTUAL_BUILD_PREFIX}"
+  else
+    echo "DEBUG: ../build_env not found, searching..."
+    find .. -maxdepth 2 -name "build_env" -type d 2>/dev/null | head -1
+  fi
 
   export PATH="${_BUILD_PREFIX_}/Library/bin:${_BUILD_PREFIX_}/Library/mingw-w64/bin:${_BUILD_PREFIX_}/bin:${PATH}"
   echo "PATH updated with OCaml and gcc directories"
