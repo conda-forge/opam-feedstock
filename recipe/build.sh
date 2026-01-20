@@ -118,26 +118,26 @@ else
 
   echo "PATH converted to Windows format (semicolon-separated, D:/ style)"
   echo "  First 3 entries:"
-  # Use ORIGINAL_PATH to execute tr/head/sed before switching to Windows PATH
-  echo "$WIN_PATH" | PATH="$ORIGINAL_PATH" tr ';' '\n' | PATH="$ORIGINAL_PATH" head -3 | PATH="$ORIGINAL_PATH" sed 's/^/    /'
+  echo "$WIN_PATH" | tr ';' '\n' | head -3 | sed 's/^/    /'
 
-  # CRITICAL FIX for dune.exe C compiler discovery:
-  # Dune is a Windows native .exe that reads PATH literally without MSYS2 conversion.
-  # When PATH contains /d/bld/..., Windows executables cannot interpret it.
+  # CRITICAL: Do NOT export WIN_PATH globally!
+  # Reason: ./configure and other bash scripts (make, autoconf) REQUIRE MSYS2 PATH
+  # to find utilities like sed, expr, awk, grep, etc.
   #
-  # Solution: Find the actual installed gcc path and convert it to Windows format,
-  # then use MSYS2_ENV_CONV_EXCL to prevent bash from reconverting it.
-  export PATH="$WIN_PATH"
+  # Problem: Dune (Windows .exe) needs Windows PATH format (D:/...; semicolons)
+  # to find compilers, but bash scripts need MSYS2 PATH (/usr/bin:/mingw64/bin)
+  #
+  # Solution: Keep MSYS2 PATH as default, pass WIN_PATH ONLY to make invocation
+  # that runs Dune. Store WIN_PATH for later use by make command.
+  export WIN_PATH_FOR_DUNE="$WIN_PATH"
 
-  # Save ORIGINAL_PATH for bash utilities (cygpath, command, etc.) that need MSYS2 paths
-  # After setting PATH to Windows format, we need MSYS2_PATH to run bash commands
-  export MSYS2_PATH="$ORIGINAL_PATH"
+  # Keep MSYS2 PATH as default - configure and bash scripts need it
+  # Do NOT set: export PATH="$WIN_PATH"
 
-  # Get the actual installation directory (before PATH munging)
+  # Get the actual installation directory
   # In conda/rattler-build, compilers are always in BUILD_PREFIX/Library/bin
-  # We need to add this in Windows format to a new DUNE_CC_PATH variable
   GCC_DIR_MSYS="${BUILD_PREFIX}/Library/bin"
-  GCC_DIR_WIN=$(PATH="$MSYS2_PATH" cygpath -w "$GCC_DIR_MSYS" 2>/dev/null || echo "$GCC_DIR_MSYS")
+  GCC_DIR_WIN=$(cygpath -w "$GCC_DIR_MSYS" 2>/dev/null || echo "$GCC_DIR_MSYS")
 
   # Export for dune to use - but in Windows format
   export DUNE_CC="${GCC_DIR_WIN}\\x86_64-w64-mingw32-gcc.exe"
@@ -159,6 +159,17 @@ else
   # Dune may cache compiler paths from previous runs, causing stale lookups
   rm -rf _build .dune 2>/dev/null || true
   echo "Cleared Dune cache directories to force fresh compiler discovery"
+
+  echo ""
+  echo "=== MSYS2 PATH (default for bash/configure/make) ==="
+  echo "PATH has $(echo "$PATH" | tr ':' '\n' | wc -l) entries"
+  echo "First 3 entries:"
+  echo "$PATH" | tr ':' '\n' | head -3 | sed 's/^/    /'
+  echo ""
+  echo "=== Windows PATH (will be passed to make for Dune) ==="
+  echo "WIN_PATH_FOR_DUNE has $(echo "$WIN_PATH_FOR_DUNE" | tr ';' '\n' | wc -l) entries"
+  echo "First 3 entries:"
+  echo "$WIN_PATH_FOR_DUNE" | tr ';' '\n' | head -3 | sed 's/^/    /'
 
   # Note: MSYS2_ARG_CONV_EXCL is NOT needed - Dune properly quotes ar arguments
   # Previous test failures were due to unquoted variables in our diagnostic script,
@@ -198,8 +209,8 @@ else
   # (wrappers break because gcc needs its full toolchain: cc1, as, ld, etc.)
 
   echo "Verifying MinGW gcc is findable..."
-  if PATH="$MSYS2_PATH" command -v x86_64-w64-mingw32-gcc.exe &>/dev/null; then
-    GCC_PATH=$(PATH="$MSYS2_PATH" command -v x86_64-w64-mingw32-gcc.exe)
+  if command -v x86_64-w64-mingw32-gcc.exe &>/dev/null; then
+    GCC_PATH=$(command -v x86_64-w64-mingw32-gcc.exe)
     echo "Found: ${GCC_PATH}"
   else
     echo "ERROR: x86_64-w64-mingw32-gcc.exe not in PATH"
@@ -287,8 +298,8 @@ if [[ "${target_platform}" != "linux-"* ]] && [[ "${target_platform}" != "osx-"*
   # Remove problematic dune rules for Windows
   # ---------------------------------------------------------------------------
   # These rules use features not available on Windows/MSYS2
-  PATH="$MSYS2_PATH" sed -i '/^(rule$/,/cc64)))/d' src/core/dune
-  PATH="$MSYS2_PATH" sed -i '/^(install$/,/opam-putenv\.exe))/d' src/core/dune
+  sed -i '/^(rule$/,/cc64)))/d' src/core/dune
+  sed -i '/^(install$/,/opam-putenv\.exe))/d' src/core/dune
 
   # ---------------------------------------------------------------------------
   # Pre-create generated .ml files
@@ -308,9 +319,9 @@ if [[ "${target_platform}" != "linux-"* ]] && [[ "${target_platform}" != "osx-"*
   # ---------------------------------------------------------------------------
   # opamCommonStubs.c uses #include to inline other C files
   pushd src/core > /dev/null
-  PATH="$MSYS2_PATH" head -n 73 opamCommonStubs.c > opam_stubs.c
-  PATH="$MSYS2_PATH" cat opamInject.c >> opam_stubs.c
-  PATH="$MSYS2_PATH" cat opamWindows.c >> opam_stubs.c
+  head -n 73 opamCommonStubs.c > opam_stubs.c
+  cat opamInject.c >> opam_stubs.c
+  cat opamWindows.c >> opam_stubs.c
   popd > /dev/null
 fi
 
@@ -319,15 +330,15 @@ if [[ "${target_platform}" != "linux-"* ]] && [[ "${target_platform}" != "osx-"*
   # DEBUG: Dump all C compiler related fields from ocamlc -config
   # ===========================================================================
   echo "=== DEBUG: Full ocamlc -config C compiler fields ==="
-  "${BUILD_PREFIX}/Library/bin/ocamlc.opt.exe" -config | PATH="$MSYS2_PATH" grep -E "c_compiler|bytecomp_c|native_c|ccomp|asm"
+  "${BUILD_PREFIX}/Library/bin/ocamlc.opt.exe" -config | grep -E "c_compiler|bytecomp_c|native_c|ccomp|asm"
   echo ""
-  echo "=== DEBUG: PATH entries (first 10) ==="
-  # PATH is now semicolon-separated Windows format
-  echo "${PATH}" | PATH="$MSYS2_PATH" tr ';' '\n' | PATH="$MSYS2_PATH" head -10
+  echo "=== DEBUG: Windows PATH entries (first 10) that Dune will see ==="
+  # Display WIN_PATH_FOR_DUNE which will be passed to make
+  echo "${WIN_PATH_FOR_DUNE}" | tr ';' '\n' | head -10
   echo ""
-  echo "=== DEBUG: Verifying PATH entries are Windows format (what Dune sees) ==="
+  echo "=== DEBUG: Verifying Windows PATH entries are D:/... format ==="
   # After conversion, all paths should be D:/... format
-  for p in $(echo "${PATH}" | PATH="$MSYS2_PATH" tr ';' '\n' | PATH="$MSYS2_PATH" head -5); do
+  for p in $(echo "${WIN_PATH_FOR_DUNE}" | tr ';' '\n' | head -5); do
     echo "  PATH entry: $p"
     if [[ -d "$p" ]]; then
       echo "    -> exists as directory"
@@ -348,12 +359,12 @@ if [[ "${target_platform}" != "linux-"* ]] && [[ "${target_platform}" != "osx-"*
   echo ""
 
   # Verify C compiler is in PATH
-  if ! PATH="$MSYS2_PATH" command -v "${CONDA_TOOLCHAIN_HOST}-gcc.exe" >/dev/null 2>&1; then
+  if ! command -v "${CONDA_TOOLCHAIN_HOST}-gcc.exe" >/dev/null 2>&1; then
     echo "ERROR: ${CONDA_TOOLCHAIN_HOST}-gcc.exe not found in PATH"
     echo "PATH=${PATH}"
     exit 1
   fi
-  echo "C compiler verified in PATH: $(PATH="$MSYS2_PATH" command -v "${CONDA_TOOLCHAIN_HOST}-gcc.exe")"
+  echo "C compiler verified in PATH: $(command -v "${CONDA_TOOLCHAIN_HOST}-gcc.exe")"
 
   # NOTE: dune-workspace workaround REMOVED
   # OCaml _3 now has conda-ocaml-cc.exe wrapper which Dune finds via ocamlc -config.
@@ -373,10 +384,10 @@ if [[ "${target_platform}" != "linux-"* ]] && [[ "${target_platform}" != "osx-"*
   #
   # The wrapper is a native Windows exe placed before BUILD_PREFIX in PATH.
 
-  REAL_AR=$(PATH="$MSYS2_PATH" command -v conda-ocaml-ar.exe)
+  REAL_AR=$(command -v conda-ocaml-ar.exe)
   # Use forward slashes - Windows APIs accept them and it avoids C escape issues
   # Convert /d/path to D:/path format (MUST uppercase drive letter to match ACTUAL_BUILD_PREFIX)
-  REAL_AR_WIN=$(echo "${REAL_AR}" | PATH="$MSYS2_PATH" sed 's|^/\([a-z]\)/|\U\1:/|')
+  REAL_AR_WIN=$(echo "${REAL_AR}" | sed 's|^/\([a-z]\)/|\U\1:/|')
 
   # CRITICAL: The wrapper will be installed as conda-ocaml-ar.exe, replacing the original.
   # We need the wrapper to call conda-ocaml-ar.exe.real (the saved original) instead.
@@ -464,17 +475,17 @@ WRAPPER_C_EOF
 
   # Substitute the real ar path into the source
   # Using forward slashes so no escaping needed
-  PATH="$MSYS2_PATH" sed -i "s|REAL_AR_PATH_PLACEHOLDER|${REAL_AR_WIN}|" ".ar_wrapper/ar_wrapper.c"
+  sed -i "s|REAL_AR_PATH_PLACEHOLDER|${REAL_AR_WIN}|" ".ar_wrapper/ar_wrapper.c"
 
   echo "Compiling ar wrapper..."
-  PATH="$MSYS2_PATH" cat ".ar_wrapper/ar_wrapper.c"
+  cat ".ar_wrapper/ar_wrapper.c"
 
   # Compile the wrapper using MinGW gcc
   "${CONDA_TOOLCHAIN_HOST}-gcc.exe" -O2 -o ".ar_wrapper/conda-ocaml-ar.exe" ".ar_wrapper/ar_wrapper.c"
 
   if [[ -f ".ar_wrapper/conda-ocaml-ar.exe" ]]; then
     echo "Wrapper compiled successfully"
-    PATH="$MSYS2_PATH" ls -la ".ar_wrapper/conda-ocaml-ar.exe"
+    ls -la ".ar_wrapper/conda-ocaml-ar.exe"
   else
     echo "ERROR: Failed to compile ar wrapper"
     exit 1
@@ -484,26 +495,30 @@ WRAPPER_C_EOF
   # Dune searches PATH for conda-ocaml-cc.exe but fails to find it
   # Creating symlinks in our wrapper directory ensures Dune finds them
   for tool in conda-ocaml-cc.exe conda-ocaml-as.exe; do
-    REAL_TOOL=$(PATH="$MSYS2_PATH" command -v "${tool}")
+    REAL_TOOL=$(command -v "${tool}")
     if [[ -n "${REAL_TOOL}" ]] && [[ -f "${REAL_TOOL}" ]]; then
       ln -sf "${REAL_TOOL}" ".ar_wrapper/${tool}"
       echo "Created symlink for ${tool}: .ar_wrapper/${tool} -> ${REAL_TOOL}"
     fi
   done
 
-  # Add wrapper directory to PATH (before BUILD_PREFIX so it's found first)
-  # Use ACTUAL_SRC_DIR (Windows D:/path format)
-  # NOTE: PATH is now semicolon-separated Windows format after earlier conversion
-  WRAPPER_DIR="${ACTUAL_SRC_DIR}/.ar_wrapper"
-  export PATH="${WRAPPER_DIR};${PATH}"
-  echo "Added wrapper directory to PATH: ${WRAPPER_DIR}"
+  # Add wrapper directory to MSYS2 PATH (colon-separated)
+  # And also to WIN_PATH_FOR_DUNE (semicolon-separated) for Dune
+  WRAPPER_DIR_MSYS="${SRC_DIR}/.ar_wrapper"
+  WRAPPER_DIR_WIN="${ACTUAL_SRC_DIR}/.ar_wrapper"
+
+  export PATH="${WRAPPER_DIR_MSYS}:${PATH}"
+  export WIN_PATH_FOR_DUNE="${WRAPPER_DIR_WIN};${WIN_PATH_FOR_DUNE}"
+
+  echo "Added wrapper directory to MSYS2 PATH: ${WRAPPER_DIR_MSYS}"
+  echo "Added wrapper directory to Windows PATH (for Dune): ${WRAPPER_DIR_WIN}"
 
   # Copy symlinks to BUILD_PREFIX/Library/bin where Dune will find them (already in PATH)
   # This avoids PATH parsing issues with Dune (Windows exe that expects semicolon-separated paths)
   echo "DEBUG: Checking if ${ACTUAL_BUILD_PREFIX}/Library/bin exists..."
-  PATH="$MSYS2_PATH" ls -ld "${ACTUAL_BUILD_PREFIX}/Library/bin" || echo "NOT FOUND"
+  ls -ld "${ACTUAL_BUILD_PREFIX}/Library/bin" || echo "NOT FOUND"
   echo "DEBUG: Contents of actual build prefix:"
-  PATH="$MSYS2_PATH" ls -la "${ACTUAL_BUILD_PREFIX}/" | PATH="$MSYS2_PATH" head -10
+  ls -la "${ACTUAL_BUILD_PREFIX}/" | head -10
 
   # Use ACTUAL_BUILD_PREFIX/Library/bin (Windows path on Windows uses Library subdirectory)
   # Use -L flag to dereference symlinks and check existence first
@@ -529,9 +544,9 @@ WRAPPER_C_EOF
   done
   echo "Finished copying wrapper symlinks to ${ACTUAL_BUILD_PREFIX}/Library/bin for Dune to find"
   echo "Contents of wrapper directory:"
-  PATH="$MSYS2_PATH" ls -la ".ar_wrapper/"
+  ls -la ".ar_wrapper/"
   echo "Testing which finds wrapper versions:"
-  PATH="$MSYS2_PATH" which conda-ocaml-ar.exe conda-ocaml-cc.exe conda-ocaml-as.exe 2>/dev/null || true
+  which conda-ocaml-ar.exe conda-ocaml-cc.exe conda-ocaml-as.exe 2>/dev/null || true
 fi
 
 # Run make with sequential jobs to reveal errors hidden by parallel execution
@@ -539,39 +554,58 @@ fi
 export DUNE_CONFIG__JOBS=1
 echo "Set DUNE_CONFIG__JOBS=1 to force sequential build (reveals hidden errors)"
 
-if ! make DUNE_ARGS="--display=verbose -j 1"; then
+# On Windows, pass Windows PATH to make so Dune can find compilers
+# On Linux/macOS, WIN_PATH_FOR_DUNE is not set, so PATH remains unchanged
+if [[ -n "${WIN_PATH_FOR_DUNE}" ]]; then
+  echo "=== Running make with Windows PATH for Dune ==="
+  if ! PATH="${WIN_PATH_FOR_DUNE}" make DUNE_ARGS="--display=verbose -j 1"; then
+    MAKE_FAILED=1
+  fi
+else
+  echo "=== Running make with native PATH ==="
+  if ! make DUNE_ARGS="--display=verbose -j 1"; then
+    MAKE_FAILED=1
+  fi
+fi
+
+if [[ "${MAKE_FAILED}" == "1" ]]; then
   echo "=== BUILD FAILED - Diagnostics ==="
 
   echo "--- ar.exe in PATH and version ---"
-  PATH="${MSYS2_PATH:-$PATH}" command -v "${CONDA_TOOLCHAIN_HOST}-ar.exe" 2>&1 || echo "ar.exe NOT FOUND"
+  command -v "${CONDA_TOOLCHAIN_HOST}-ar.exe" 2>&1 || echo "ar.exe NOT FOUND"
   "${CONDA_TOOLCHAIN_HOST}-ar.exe" --version 2>&1 || echo "ar --version failed"
 
   echo "--- Checking key build artifacts ---"
   echo "opam_client.a:"
-  PATH="${MSYS2_PATH:-$PATH}" ls -la _build/default/src/client/opam_client.a 2>&1 || echo "  NOT FOUND"
+  ls -la _build/default/src/client/opam_client.a 2>&1 || echo "  NOT FOUND"
   echo "opam_client.cmxa:"
-  PATH="${MSYS2_PATH:-$PATH}" ls -la _build/default/src/client/opam_client.cmxa 2>&1 || echo "  NOT FOUND"
+  ls -la _build/default/src/client/opam_client.cmxa 2>&1 || echo "  NOT FOUND"
   echo "OpamMain.o:"
-  PATH="${MSYS2_PATH:-$PATH}" ls -la _build/default/src/client/.opamMain.eobjs/native/dune__exe__OpamMain.o 2>&1 || echo "  NOT FOUND"
+  ls -la _build/default/src/client/.opamMain.eobjs/native/dune__exe__OpamMain.o 2>&1 || echo "  NOT FOUND"
   echo "OpamMain.cmx:"
-  PATH="${MSYS2_PATH:-$PATH}" ls -la _build/default/src/client/.opamMain.eobjs/native/dune__exe__OpamMain.cmx 2>&1 || echo "  NOT FOUND"
+  ls -la _build/default/src/client/.opamMain.eobjs/native/dune__exe__OpamMain.cmx 2>&1 || echo "  NOT FOUND"
   echo "opam.exe (final binary):"
-  PATH="${MSYS2_PATH:-$PATH}" ls -la _build/default/src/client/opam.exe 2>&1 || echo "  NOT FOUND (expected - linking never started)"
+  ls -la _build/default/src/client/opam.exe 2>&1 || echo "  NOT FOUND (expected - linking never started)"
 
   echo "--- All .a archives created ---"
-  PATH="${MSYS2_PATH:-$PATH}" find _build/default -name "*.a" -type f 2>/dev/null | PATH="${MSYS2_PATH:-$PATH}" head -20
+  find _build/default -name "*.a" -type f 2>/dev/null | head -20
 
   echo "--- Dune _build/log (last 100 lines) ---"
-  PATH="${MSYS2_PATH:-$PATH}" cat _build/log 2>&1 | PATH="${MSYS2_PATH:-$PATH}" tail -100 || echo "No Dune log found"
+  cat _build/log 2>&1 | tail -100 || echo "No Dune log found"
 
   echo "--- Check if link-opam-manifest was created ---"
-  PATH="${MSYS2_PATH:-$PATH}" ls -la _build/default/src/client/link-opam-manifest* 2>&1 || echo "link-opam-manifest NOT FOUND"
+  ls -la _build/default/src/client/link-opam-manifest* 2>&1 || echo "link-opam-manifest NOT FOUND"
 
   echo "--- Check linking.sexp ---"
-  PATH="${MSYS2_PATH:-$PATH}" cat _build/default/src/client/linking.sexp 2>&1 || echo "linking.sexp NOT FOUND"
+  cat _build/default/src/client/linking.sexp 2>&1 || echo "linking.sexp NOT FOUND"
 
   echo "=== End Diagnostics ==="
   exit 1
 fi
 
-make install
+# Run make install with same PATH strategy as build
+if [[ -n "${WIN_PATH_FOR_DUNE}" ]]; then
+  PATH="${WIN_PATH_FOR_DUNE}" make install
+else
+  make install
+fi
