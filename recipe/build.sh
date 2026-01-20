@@ -110,10 +110,16 @@ else
   done
   IFS="$OLD_IFS"
 
-  export PATH="$WIN_PATH"
+  # First, verify gcc is in ORIGINAL_PATH (before converting to Windows format)
+  if ! PATH="$ORIGINAL_PATH" command -v x86_64-w64-mingw32-gcc.exe >/dev/null 2>&1; then
+    echo "ERROR: x86_64-w64-mingw32-gcc.exe not found in bash PATH"
+    exit 1
+  fi
+
   echo "PATH converted to Windows format (semicolon-separated, D:/ style)"
   echo "  First 3 entries:"
-  echo "$PATH" | tr ';' '\n' | head -3 | sed 's/^/    /'
+  # Use ORIGINAL_PATH to execute tr/head/sed before switching to Windows PATH
+  echo "$WIN_PATH" | PATH="$ORIGINAL_PATH" tr ';' '\n' | PATH="$ORIGINAL_PATH" head -3 | PATH="$ORIGINAL_PATH" sed 's/^/    /'
 
   # CRITICAL FIX for dune.exe C compiler discovery:
   # Dune is a Windows native .exe that reads PATH literally without MSYS2 conversion.
@@ -121,18 +127,17 @@ else
   #
   # Solution: Find the actual installed gcc path and convert it to Windows format,
   # then use MSYS2_ENV_CONV_EXCL to prevent bash from reconverting it.
+  export PATH="$WIN_PATH"
 
-  # First, verify gcc is in PATH (bash can find it)
-  if ! command -v x86_64-w64-mingw32-gcc.exe >/dev/null 2>&1; then
-    echo "ERROR: x86_64-w64-mingw32-gcc.exe not found in bash PATH"
-    exit 1
-  fi
+  # Save ORIGINAL_PATH for bash utilities (cygpath, command, etc.) that need MSYS2 paths
+  # After setting PATH to Windows format, we need MSYS2_PATH to run bash commands
+  export MSYS2_PATH="$ORIGINAL_PATH"
 
   # Get the actual installation directory (before PATH munging)
   # In conda/rattler-build, compilers are always in BUILD_PREFIX/Library/bin
   # We need to add this in Windows format to a new DUNE_CC_PATH variable
   GCC_DIR_MSYS="${BUILD_PREFIX}/Library/bin"
-  GCC_DIR_WIN=$(cygpath -w "$GCC_DIR_MSYS" 2>/dev/null || echo "$GCC_DIR_MSYS")
+  GCC_DIR_WIN=$(PATH="$MSYS2_PATH" cygpath -w "$GCC_DIR_MSYS" 2>/dev/null || echo "$GCC_DIR_MSYS")
 
   # Export for dune to use - but in Windows format
   export DUNE_CC="${GCC_DIR_WIN}\\x86_64-w64-mingw32-gcc.exe"
@@ -193,8 +198,8 @@ else
   # (wrappers break because gcc needs its full toolchain: cc1, as, ld, etc.)
 
   echo "Verifying MinGW gcc is findable..."
-  if command -v x86_64-w64-mingw32-gcc.exe &>/dev/null; then
-    GCC_PATH=$(command -v x86_64-w64-mingw32-gcc.exe)
+  if PATH="$MSYS2_PATH" command -v x86_64-w64-mingw32-gcc.exe &>/dev/null; then
+    GCC_PATH=$(PATH="$MSYS2_PATH" command -v x86_64-w64-mingw32-gcc.exe)
     echo "Found: ${GCC_PATH}"
   else
     echo "ERROR: x86_64-w64-mingw32-gcc.exe not in PATH"
@@ -267,11 +272,11 @@ if [[ "${target_platform}" != "linux-"* ]] && [[ "${target_platform}" != "osx-"*
   # ---------------------------------------------------------------------------
   # Verify C compiler is available (PATH already set above)
   # ---------------------------------------------------------------------------
-  EXPECTED_CC=$(ocamlc -config | grep "^c_compiler:" | awk '{print $2}')
+  EXPECTED_CC=$(ocamlc -config | PATH="$MSYS2_PATH" grep "^c_compiler:" | PATH="$MSYS2_PATH" awk '{print $2}')
   echo "OCaml expects C compiler: ${EXPECTED_CC}"
 
-  if command -v "${EXPECTED_CC}" &>/dev/null; then
-    echo "C compiler found: $(command -v "${EXPECTED_CC}")"
+  if PATH="$MSYS2_PATH" command -v "${EXPECTED_CC}" &>/dev/null; then
+    echo "C compiler found: $(PATH="$MSYS2_PATH" command -v "${EXPECTED_CC}")"
   else
     echo "ERROR: ${EXPECTED_CC} not found in PATH"
     echo "PATH: ${PATH}"
