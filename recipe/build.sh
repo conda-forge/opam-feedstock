@@ -52,14 +52,14 @@ else
   ACTUAL_BUILD_PREFIX_MSYS="$(realpath ../build_env)"  # /d/bld/.../build_env
 
   # Convert MSYS2 /d/path to Windows D:/path format (lowercase drive letter to uppercase, add colon)
-  # MSYS2 sed doesn't support \U, so use bash parameter expansion instead
+  # Use tr for uppercase conversion (bash ^^ operator not available in older bash versions)
   src_drive="${ACTUAL_SRC_DIR_MSYS:1:1}"  # Extract 'd' from '/d/...'
-  src_drive_upper="${src_drive^^}"  # Uppercase to 'D'
+  src_drive_upper=$(echo "$src_drive" | tr '[:lower:]' '[:upper:]')  # Uppercase to 'D'
   src_rest="${ACTUAL_SRC_DIR_MSYS:2}"  # Extract '/bld/...' (everything after '/d')
   ACTUAL_SRC_DIR="${src_drive_upper}:${src_rest}"  # Combine to 'D:/bld/...'
 
   build_drive="${ACTUAL_BUILD_PREFIX_MSYS:1:1}"  # Extract 'd' from '/d/...'
-  build_drive_upper="${build_drive^^}"  # Uppercase to 'D'
+  build_drive_upper=$(echo "$build_drive" | tr '[:lower:]' '[:upper:]')  # Uppercase to 'D'
   build_rest="${ACTUAL_BUILD_PREFIX_MSYS:2}"  # Extract '/bld/...' (everything after '/d')
   ACTUAL_BUILD_PREFIX="${build_drive_upper}:${build_rest}"  # Combine to 'D:/bld/...'
 
