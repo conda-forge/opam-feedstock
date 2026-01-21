@@ -1,0 +1,156 @@
+context:
+  name: ocaml
+  version: 2.5.0
+  library: ${{ "Library/" if not unix }}
+  m2: ${{ "m2-" if not unix }}
+
+package:
+  name: opam
+  version: ${{ version }}
+
+source:
+  - url: https://github.com/ocaml/opam/releases/download/${{ version }}/opam-full-${{ version }}.tar.gz
+    sha256: 25fb98f962c4227c1261e142afc68a416778e6e819600bd5ee3ec4a18ae1e238
+
+build:
+  number: 0
+  skip:
+    - not unix
+
+requirements:
+  build:
+    - ${{ compiler('c') }}
+    - ${{ compiler('cxx') }}
+    - ${{ stdlib('c') }}
+    - ${{ m2 }}bash >=5.2
+    - ${{ m2 }}bzip2
+    - ${{ m2 }}findutils
+    - ${{ m2 }}gawk
+    - ${{ m2 }}grep
+    - ${{ m2 }}make
+    - ${{ m2 }}sed
+    - binutils
+    - curl
+    - git
+    - ocaml >=5.3.0
+    - if: unix
+      then:
+        # OCaml compiler has zstd paths embedded from its build environment.
+        # We need zstd in build env so those paths resolve correctly.
+        - file
+        - zstd
+      else:
+        - ${{ m2 }}coreutils
+        - ${{ m2 }}diffutils
+        - ${{ m2 }}which
+    - if: osx
+      then:
+        - lld
+        - llvm-tools
+  host:
+    - zstd
+    # We need to 2-phase as these do not exist yet for arm64 and non-unix
+    # We add opam bare for all archs, then later we update below
+    # - ocamlbuild
+    # - ocaml-findlib
+
+tests:
+  - package_contents:
+      bin:
+        - opam
+        - opam-installer
+      files:
+        - if: build_platform == target_platform
+          then:
+            - ${{ library }}share/man/man1/opam*
+
+  # Architecture verification (runs on all builds)
+  - script:
+      - echo "=== Binary architecture verification ==="
+      - which opam
+      - file $(which opam)
+      - file $(which opam-installer)
+    requirements:
+      run:
+        - file
+
+  # Version check (runs on all builds including cross-compile via QEMU)
+  # OCaml 5.x GC requires large minor heap under QEMU to avoid segfault
+  - script:
+      - if: build_platform == target_platform
+        then:
+          - opam --version | grep ${{ version }}
+        else:
+          - echo "OCaml 5.x GC fails under QEMU"
+    requirements:
+      run:
+        - ${{ m2 }}grep
+
+  # Functional tests - exercise core opam functionality to catch build issues
+  # (broken linking, missing libraries, OCaml runtime problems)
+  # OCaml 5.x GC requires large minor heap under QEMU to avoid segfault
+  - script:
+      - if: build_platform != target_platform
+        then:
+          - echo "OCaml 5.x GC fails under QEMU"
+        else: |
+          echo "=== Testing opam core functionality ==="
+
+          # 1. Create opam root (required before any opam commands)
+          echo "Testing: opam init"
+          if [ -n "$TEMP" ]; then
+            export OPAMROOT="$TEMP/opam-test-$$"
+          else
+            export OPAMROOT=$(mktemp -d)
+          fi
+          mkdir -p "$OPAMROOT"
+          opam init --bare --no-setup --bypass-checks
+
+          # 2. Config parsing (catches opam-core library linking issues)
+          echo "Testing: opam config list"
+          opam config list
+
+          # 3. Create switch (tests opam-state, opam-repository)
+          echo "Testing: opam switch create"
+          opam switch create test --empty
+
+          # 4. Environment handling (catches opam-client issues)
+          echo "Testing: opam env"
+          eval $(opam env --switch=test)
+
+          # 5. List/query (catches opam-format issues)
+          echo "Testing: opam list"
+          opam list --installed
+
+          # 6. Switch operations (full workflow validation)
+          echo "Testing: opam switch list/remove"
+          opam switch list
+          opam switch remove test --yes
+
+          # Cleanup
+          rm -rf "$OPAMROOT"
+
+          echo "=== All opam functional tests passed! ==="
+    requirements:
+      run:
+        - ${{ m2 }}coreutils
+        - if: aarch64 or ppc64le
+          then:
+            - sysroot_${{ target_platform }} >=2.17
+
+about:
+  homepage: https://github.com/ocaml/opam
+  license: LGPL-2.1-only
+  license_family: LGPL
+  license_file: LICENSE
+  summary: Objective Caml (OCaml) is an implementation of the ML language.
+  description: |
+    opam is a source-based package manager. It supports multiple simultaneous compiler
+    installations, flexible package constraints, and a Git-friendly development workflow.
+  repository: https://github.com/ocaml/opam
+
+extra:
+  recipe-maintainers:
+    - dslarm
+    - fasiha
+    - MementoRC

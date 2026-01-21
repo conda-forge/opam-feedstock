@@ -1,0 +1,25 @@
+c_compiler:
+  - if: not unix
+    then:
+      - gcc
+
+cxx_compiler:
+  - if: not unix
+    then:
+      - gxx
+
+# c_compiler_version:
+#   - if: not unix
+#     then:
+#       - 14
+
+c_stdlib:
+  - if: not unix
+    then:
+      - m2w64-sysroot
+
+# c_stdlib_version:
+#   - if: not unix
+#     then:
+#       - 12
+
