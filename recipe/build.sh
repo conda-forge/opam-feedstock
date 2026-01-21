@@ -52,8 +52,16 @@ else
   ACTUAL_BUILD_PREFIX_MSYS="$(realpath ../build_env)"  # /d/bld/.../build_env
 
   # Convert MSYS2 /d/path to Windows D:/path format (lowercase drive letter to uppercase, add colon)
-  ACTUAL_SRC_DIR="$(echo "${ACTUAL_SRC_DIR_MSYS}" | sed 's|^/\([a-z]\)/|\U\1:/|')"
-  ACTUAL_BUILD_PREFIX="$(echo "${ACTUAL_BUILD_PREFIX_MSYS}" | sed 's|^/\([a-z]\)/|\U\1:/|')"
+  # MSYS2 sed doesn't support \U, so use bash parameter expansion instead
+  src_drive="${ACTUAL_SRC_DIR_MSYS:1:1}"  # Extract 'd' from '/d/...'
+  src_drive_upper="${src_drive^^}"  # Uppercase to 'D'
+  src_rest="${ACTUAL_SRC_DIR_MSYS:2}"  # Extract '/bld/...' (everything after '/d')
+  ACTUAL_SRC_DIR="${src_drive_upper}:${src_rest}"  # Combine to 'D:/bld/...'
+
+  build_drive="${ACTUAL_BUILD_PREFIX_MSYS:1:1}"  # Extract 'd' from '/d/...'
+  build_drive_upper="${build_drive^^}"  # Uppercase to 'D'
+  build_rest="${ACTUAL_BUILD_PREFIX_MSYS:2}"  # Extract '/bld/...' (everything after '/d')
+  ACTUAL_BUILD_PREFIX="${build_drive_upper}:${build_rest}"  # Combine to 'D:/bld/...'
 
   echo "DEBUG: ACTUAL_SRC_DIR_MSYS=${ACTUAL_SRC_DIR_MSYS}"
   echo "DEBUG: ACTUAL_BUILD_PREFIX_MSYS=${ACTUAL_BUILD_PREFIX_MSYS}"
@@ -136,8 +144,9 @@ else
 
   # Get the actual installation directory
   # In conda/rattler-build, compilers are always in BUILD_PREFIX/Library/bin
-  GCC_DIR_MSYS="${BUILD_PREFIX}/Library/bin"
-  GCC_DIR_WIN=$(cygpath -w "$GCC_DIR_MSYS" 2>/dev/null || echo "$GCC_DIR_MSYS")
+  # Use ACTUAL_BUILD_PREFIX_MSYS instead of BUILD_PREFIX (which is %BUILD_PREFIX% placeholder)
+  GCC_DIR_MSYS="${ACTUAL_BUILD_PREFIX_MSYS}/Library/bin"
+  GCC_DIR_WIN="${ACTUAL_BUILD_PREFIX}/Library/bin"  # Already in Windows format
 
   # Export for dune to use - but in Windows format
   export DUNE_CC="${GCC_DIR_WIN}\\x86_64-w64-mingw32-gcc.exe"
@@ -534,7 +543,8 @@ WRAPPER_C_EOF
 
   # Add wrapper directory to MSYS2 PATH (colon-separated)
   # And also to WIN_PATH_FOR_DUNE (semicolon-separated) for Dune
-  WRAPPER_DIR_MSYS="${SRC_DIR}/.ar_wrapper"
+  # Use ACTUAL_SRC_DIR_MSYS instead of SRC_DIR (which is %SRC_DIR% placeholder on Windows)
+  WRAPPER_DIR_MSYS="${ACTUAL_SRC_DIR_MSYS}/.ar_wrapper"
   WRAPPER_DIR_WIN="${ACTUAL_SRC_DIR}/.ar_wrapper"
 
   export PATH="${WRAPPER_DIR_MSYS}:${PATH}"
