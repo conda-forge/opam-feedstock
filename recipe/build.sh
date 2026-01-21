@@ -629,6 +629,7 @@ export DUNE_CONFIG__JOBS=1
 echo "Set DUNE_CONFIG__JOBS=1 to force sequential build (reveals hidden errors)"
 
 echo "=== Running make ==="
+MAKE_FAILED=0
 if [[ "${target_platform}" != "linux-"* ]] && [[ "${target_platform}" != "osx-"* ]]; then
   # On Windows, Dune (native Windows .exe) needs to find tools in PATH.
   # Dune can't parse MSYS2-style paths (/d/bld/...), only Windows paths (D:/bld/...).
