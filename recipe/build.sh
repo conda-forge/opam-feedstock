@@ -343,8 +343,9 @@ if [[ "${target_platform}" != "linux-"* ]] && [[ "${target_platform}" != "osx-"*
   # The link-opam-manifest feature is optional (embeds version info) and not needed
   # for conda-forge builds.
   #
-  # Solution: Remove the entire (select ...) clause from the libraries list.
-  sed -i '/(select link-opam-manifest/,/))/d' src/client/dune
+  # Solution: Replace the entire (select ...) clause with just "opam-client" library.
+  # The select clause spans 4 lines with nested parens, so use a multi-line sed pattern.
+  sed -i '/libraries   opam-client/,/)))/c\  (libraries   opam-client)' src/client/dune
   echo "Removed (select link-opam-manifest ...) clause from src/client/dune"
 fi
 
