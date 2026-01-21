@@ -1,13 +1,41 @@
-#!/usr/bin/env bash
-set -euo pipefail
-IFS=$'\n\t'
-
 # ==============================================================================
 # OPAM Build Helper Functions
 # ==============================================================================
 # This file contains all reusable helper functions for the opam build process.
 # Sourced by build.sh for cleaner organization.
 # ==============================================================================
+
+# ==============================================================================
+# CONSTANTS
+# ==============================================================================
+
+# Man page commands to generate
+readonly OPAM_COMMANDS=(init install remove upgrade switch pin source list show search info config env var exec repository update option lock clean reinstall admin)
+readonly OPAM_ADMIN_COMMANDS=(cache check filter list)
+
+# Limits for verification output
+readonly PARSER_SAMPLE_LIMIT=20
+readonly OCAML_RUNTIME_SAMPLE=5
+readonly OPAM_STUB_HEADER_LINES=73
+
+readonly SAVED_PARSERS_DIR="${SRC_DIR}/_saved_parsers"
+
+# ==============================================================================
+# PLATFORM DETECTION
+# ==============================================================================
+
+# Platform detection
+is_macos() { [[ "${target_platform}" == "osx-"* ]]; }
+is_linux() { [[ "${target_platform}" == "linux-"* ]]; }
+is_windows() { [[ "${target_platform}" != "linux-"* ]] && [[ "${target_platform}" != "osx-"* ]]; }
+is_cross_compile() { [[ "${CONDA_BUILD_CROSS_COMPILATION:-}" == "1" ]]; }
+build_is_macos() { [[ "${build_platform:-${target_platform}}" == "osx-"* ]]; }
+
+# Convenience wrappers for readability
+get_target_c_compiler() { get_compiler "c" "${CONDA_TOOLCHAIN_HOST:-}"; }
+get_target_cxx_compiler() { get_compiler "cxx" "${CONDA_TOOLCHAIN_HOST:-}"; }
+get_build_c_compiler() { get_compiler "c" "${CONDA_TOOLCHAIN_BUILD:-}"; }
+get_build_cxx_compiler() { get_compiler "cxx" "${CONDA_TOOLCHAIN_BUILD:-}"; }
 
 # ==============================================================================
 # HELPER FUNCTIONS - Error Handling & Utilities
@@ -105,30 +133,6 @@ generate_native_man_pages() {
   ls -la "${native_man_dir}/"*.1 2>/dev/null | head -10 || echo "  (none generated)"
 }
 
-# ==============================================================================
-# CONSTANTS
-# ==============================================================================
-
-# Man page commands to generate
-readonly OPAM_COMMANDS=(init install remove upgrade switch pin source list show search info config env var exec repository update option lock clean reinstall admin)
-readonly OPAM_ADMIN_COMMANDS=(cache check filter list)
-
-# Limits for verification output
-readonly PARSER_SAMPLE_LIMIT=20
-readonly OCAML_RUNTIME_SAMPLE=5
-readonly OPAM_STUB_HEADER_LINES=73
-
-# ==============================================================================
-# PLATFORM DETECTION
-# ==============================================================================
-
-# Platform detection
-is_macos() { [[ "${target_platform}" == "osx-"* ]]; }
-is_linux() { [[ "${target_platform}" == "linux-"* ]]; }
-is_windows() { [[ "${target_platform}" != "linux-"* ]] && [[ "${target_platform}" != "osx-"* ]]; }
-is_cross_compile() { [[ "${CONDA_BUILD_CROSS_COMPILATION:-}" == "1" ]]; }
-build_is_macos() { [[ "${build_platform:-${target_platform}}" == "osx-"* ]]; }
-
 # Get compiler path based on type and toolchain
 # Usage: get_compiler "c" [toolchain_prefix]  -> returns gcc/clang path
 #        get_compiler "cxx" [toolchain_prefix] -> returns g++/clang++ path
@@ -161,12 +165,6 @@ get_compiler() {
     echo "${cxx_compiler}"
   fi
 }
-
-# Convenience wrappers for readability
-get_target_c_compiler() { get_compiler "c" "${CONDA_TOOLCHAIN_HOST:-}"; }
-get_target_cxx_compiler() { get_compiler "cxx" "${CONDA_TOOLCHAIN_HOST:-}"; }
-get_build_c_compiler() { get_compiler "c" "${CONDA_TOOLCHAIN_BUILD:-}"; }
-get_build_cxx_compiler() { get_compiler "cxx" "${CONDA_TOOLCHAIN_BUILD:-}"; }
 
 # ==============================================================================
 # CROSS-COMPILATION SETUP FUNCTIONS
@@ -383,7 +381,7 @@ apply_windows_workarounds() {
   sed -i '/^(install$/,/opam-putenv\.exe))/d' src/core/dune
 
   # Pre-create generated .ml files
-  echo "let value = \"\"\"" > src/core/opamCoreConfigDeveloper.ml
+  echo "let value = \"\"" > src/core/opamCoreConfigDeveloper.ml
   echo "let version = \"${PKG_VERSION}\"" > src/core/opamVersionInfo.ml
   cp src/core/opamStubs.ocaml5.ml src/core/opamStubs.ml
   cp src/core/opamWin32Stubs.win32.ml src/core/opamWin32Stubs.ml
@@ -407,8 +405,6 @@ apply_windows_workarounds() {
 # These functions manage pre-generated parser files for cross-compilation.
 # Parser generators (menhir) produce .ml/.mli files that must be pre-generated
 # with native tools since cross-compiled generators can't run on build machine.
-
-SAVED_PARSERS_DIR="${SRC_DIR}/_saved_parsers"
 
 # Copy menhir's own stage2 parser files from build dir to source dir
 copy_menhir_stage2_to_source() {

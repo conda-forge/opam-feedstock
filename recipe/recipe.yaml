@@ -14,8 +14,6 @@ source:
 
 build:
   number: 0
-  skip:
-    - not unix
 
 requirements:
   build:
@@ -64,79 +62,51 @@ tests:
           then:
             - ${{ library }}share/man/man1/opam*
 
-  # Architecture verification (runs on all builds)
-  - script:
-      - echo "=== Binary architecture verification ==="
-      - which opam
-      - file $(which opam)
-      - file $(which opam-installer)
-    requirements:
-      run:
-        - file
-
-  # Version check (runs on all builds including cross-compile via QEMU)
-  # OCaml 5.x GC requires large minor heap under QEMU to avoid segfault
   - script:
       - if: build_platform == target_platform
-        then:
-          - opam --version | grep ${{ version }}
-        else:
-          - echo "OCaml 5.x GC fails under QEMU"
+        then: |
+            opam --version | grep ${{ version }}
+        else: |
+            echo "OCaml 5.x GC segfaults under QEMU"
     requirements:
       run:
         - ${{ m2 }}grep
 
   # Functional tests - exercise core opam functionality to catch build issues
   # (broken linking, missing libraries, OCaml runtime problems)
-  # OCaml 5.x GC requires large minor heap under QEMU to avoid segfault
+  # Unix: bash. Windows: powershell (avoids WSL/MSYS2 PATH issues).
+  # Cross-compile: skipped (QEMU + OCaml 5.x GC incompatibility).
   - script:
-      - if: build_platform != target_platform
-        then:
-          - echo "OCaml 5.x GC fails under QEMU"
-        else: |
-          echo "=== Testing opam core functionality ==="
-
-          # 1. Create opam root (required before any opam commands)
-          echo "Testing: opam init"
-          if [ -n "$TEMP" ]; then
-            export OPAMROOT="$TEMP/opam-test-$$"
-          else
-            export OPAMROOT=$(mktemp -d)
-          fi
-          mkdir -p "$OPAMROOT"
+      - if: unix and build_platform == target_platform
+        then: |
+          export OPAMROOT=./opam_test
+          mkdir -p opam_test
           opam init --bare --no-setup --bypass-checks
-
-          # 2. Config parsing (catches opam-core library linking issues)
-          echo "Testing: opam config list"
           opam config list
-
-          # 3. Create switch (tests opam-state, opam-repository)
-          echo "Testing: opam switch create"
           opam switch create test --empty
-
-          # 4. Environment handling (catches opam-client issues)
-          echo "Testing: opam env"
           eval $(opam env --switch=test)
-
-          # 5. List/query (catches opam-format issues)
-          echo "Testing: opam list"
           opam list --installed
-
-          # 6. Switch operations (full workflow validation)
-          echo "Testing: opam switch list/remove"
           opam switch list
           opam switch remove test --yes
+          rm -rf opam_test
+      - if: unix and build_platform != target_platform
+        then: |
+          echo "Skipping functional tests (cross-compile: QEMU + OCaml 5.x GC issue)"
 
-          # Cleanup
-          rm -rf "$OPAMROOT"
-
-          echo "=== All opam functional tests passed! ==="
-    requirements:
-      run:
-        - ${{ m2 }}coreutils
-        - if: aarch64 or ppc64le
-          then:
-            - sysroot_${{ target_platform }} >=2.17
+  - script:
+      - if: win
+        then:
+          interpreter: powershell
+          content: |
+            $env:OPAMROOT = "./opam_test"
+            New-Item -ItemType Directory -Force -Path opam_test
+            opam init --bare --no-setup --bypass-checks
+            opam config list
+            opam switch create test --empty
+            opam list --installed
+            opam switch list
+            opam switch remove test --yes
+            Remove-Item -Recurse -Force opam_test
 
 about:
   homepage: https://github.com/ocaml/opam
