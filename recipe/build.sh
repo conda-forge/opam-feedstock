@@ -616,10 +616,10 @@ if [[ "${target_platform}" != "linux-"* ]] && [[ "${target_platform}" != "osx-"*
   # On Windows, Dune (native Windows .exe) needs to find tools in PATH.
   # Dune can't parse MSYS2-style paths (/d/bld/...), only Windows paths (D:/bld/...).
   #
-  # Solution: Prepend Windows-format wrapper directory to PATH so Dune can find tools.
-  # MSYS2 bash can handle both formats in PATH simultaneously.
-  export PATH="${ACTUAL_BUILD_PREFIX}/Library/bin:${PATH}"
-  echo "Prepended Windows-format wrapper dir to PATH for Dune: ${ACTUAL_BUILD_PREFIX}/Library/bin"
+  # Solution: Prepend Windows-format wrapper directory (from _BUILD_PREFIX_ set by build.bat)
+  # to PATH so Dune can find tools. MSYS2 bash can handle both formats in PATH simultaneously.
+  export PATH="${_BUILD_PREFIX_}/Library/bin:${PATH}"
+  echo "Prepended Windows-format wrapper dir to PATH for Dune: ${_BUILD_PREFIX_}/Library/bin"
 
   if ! make DUNE_ARGS="--display=verbose -j 1"; then
     MAKE_FAILED=1
