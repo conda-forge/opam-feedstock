@@ -415,10 +415,10 @@ if [[ "${target_platform}" != "linux-"* ]] && [[ "${target_platform}" != "osx-"*
   #
   # The wrapper is a native Windows exe placed before BUILD_PREFIX in PATH.
 
-  REAL_AR=$(command -v conda-ocaml-ar.exe)
-  # Use forward slashes - Windows APIs accept them and it avoids C escape issues
-  # Convert /d/path to D:/path format (MUST uppercase drive letter to match ACTUAL_BUILD_PREFIX)
-  REAL_AR_WIN=$(echo "${REAL_AR}" | sed 's|^/\([a-z]\)/|\U\1:/|')
+  # Use ACTUAL_BUILD_PREFIX directly instead of 'command -v' to avoid %BUILD_PREFIX% variable
+  # CRITICAL: 'command -v' returns paths with unexpanded %BUILD_PREFIX% on conda-forge CI
+  # ACTUAL_BUILD_PREFIX is already in Windows D:/bld/... format
+  REAL_AR_WIN="${ACTUAL_BUILD_PREFIX}/Library/bin/conda-ocaml-ar.exe"
 
   # CRITICAL: The wrapper will be installed as conda-ocaml-ar.exe, replacing the original.
   # We need the wrapper to call conda-ocaml-ar.exe.real (the saved original) instead.
@@ -426,7 +426,6 @@ if [[ "${target_platform}" != "linux-"* ]] && [[ "${target_platform}" != "osx-"*
   REAL_AR_WIN="${REAL_AR_WIN}.real"
 
   echo "Creating ar wrapper to handle false-positive exit codes"
-  echo "Real conda-ocaml-ar.exe: ${REAL_AR}"
   echo "Wrapper will call (Windows path): ${REAL_AR_WIN}"
 
   # Create wrapper directory
