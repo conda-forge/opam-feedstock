@@ -279,6 +279,20 @@ else
 fi
 
 # ==============================================================================
+# Apply Dune patch after vendored extraction
+# ==============================================================================
+# The patch must be applied AFTER ./configure extracts dune-local from vendored deps.
+# If applied before (via recipe.yaml patches), it gets overwritten by extraction.
+if [[ "${target_platform}" != "linux-"* ]] && [[ "${target_platform}" != "osx-"* ]]; then
+  echo "Applying Dune which.ml patch to fix double-.exe bug on Windows"
+  patch -p1 -d src_ext/dune-local < "${RECIPE_DIR}/0001-fix-dune-which-double-exe-on-windows.patch" || {
+    echo "ERROR: Failed to apply Dune patch"
+    exit 1
+  }
+  echo "Dune patch applied successfully"
+fi
+
+# ==============================================================================
 # Windows: Dune workarounds
 # ==============================================================================
 # Dune on Windows doesn't properly handle conditional rules during analysis.
