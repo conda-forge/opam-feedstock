@@ -334,21 +334,18 @@ if [[ "${target_platform}" != "linux-"* ]] && [[ "${target_platform}" != "osx-"*
   popd > /dev/null
 
   # ---------------------------------------------------------------------------
-  # Pre-create Dune linking files that have (mode fallback) rules
+  # Remove problematic (select ...) clause from opamMain executable
   # ---------------------------------------------------------------------------
   # Problem: Dune on Windows fails silently when processing (select ...) clauses
-  # in the executable rule if the fallback files don't exist yet.
+  # in executable rules. The opamMain executable has a (select link-opam-manifest ...)
+  # clause that causes Dune to exit with error code 1 without any error message.
   #
-  # The opamMain executable has:
-  # - (select link-opam-manifest from ...) with fallback to link-opam-manifest.dummy
-  # - linking.sexp with (mode fallback) rule
+  # The link-opam-manifest feature is optional (embeds version info) and not needed
+  # for conda-forge builds.
   #
-  # Solution: Pre-create these files before running make, so Dune doesn't try
-  # to evaluate the fallback rules during the build.
-  mkdir -p src/client
-  touch src/client/link-opam-manifest.dummy
-  echo "()" > src/client/linking.sexp
-  echo "Pre-created src/client/link-opam-manifest.dummy and linking.sexp for Dune"
+  # Solution: Remove the entire (select ...) clause from the libraries list.
+  sed -i '/(select link-opam-manifest/,/))/d' src/client/dune
+  echo "Removed (select link-opam-manifest ...) clause from src/client/dune"
 fi
 
 if [[ "${target_platform}" != "linux-"* ]] && [[ "${target_platform}" != "osx-"* ]]; then
