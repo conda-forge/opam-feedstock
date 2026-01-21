@@ -613,9 +613,15 @@ echo "Set DUNE_CONFIG__JOBS=1 to force sequential build (reveals hidden errors)"
 
 echo "=== Running make ==="
 if [[ "${target_platform}" != "linux-"* ]] && [[ "${target_platform}" != "osx-"* ]]; then
-  # On Windows, Dune needs Windows-format PATH (semicolon-separated, D:/ style)
-  # Pass WIN_PATH_FOR_DUNE as PATH to make so Dune can find conda-ocaml-cc.exe
-  if ! PATH="${WIN_PATH_FOR_DUNE}" make DUNE_ARGS="--display=verbose -j 1"; then
+  # On Windows, Dune (native Windows .exe) needs to find tools in PATH.
+  # Dune can't parse MSYS2-style paths (/d/bld/...), only Windows paths (D:/bld/...).
+  #
+  # Solution: Prepend Windows-format wrapper directory to PATH so Dune can find tools.
+  # MSYS2 bash can handle both formats in PATH simultaneously.
+  export PATH="${ACTUAL_BUILD_PREFIX}/Library/bin:${PATH}"
+  echo "Prepended Windows-format wrapper dir to PATH for Dune: ${ACTUAL_BUILD_PREFIX}/Library/bin"
+
+  if ! make DUNE_ARGS="--display=verbose -j 1"; then
     MAKE_FAILED=1
   fi
 else
