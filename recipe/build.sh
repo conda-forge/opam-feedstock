@@ -332,6 +332,23 @@ if [[ "${target_platform}" != "linux-"* ]] && [[ "${target_platform}" != "osx-"*
   cat opamInject.c >> opam_stubs.c
   cat opamWindows.c >> opam_stubs.c
   popd > /dev/null
+
+  # ---------------------------------------------------------------------------
+  # Pre-create Dune linking files that have (mode fallback) rules
+  # ---------------------------------------------------------------------------
+  # Problem: Dune on Windows fails silently when processing (select ...) clauses
+  # in the executable rule if the fallback files don't exist yet.
+  #
+  # The opamMain executable has:
+  # - (select link-opam-manifest from ...) with fallback to link-opam-manifest.dummy
+  # - linking.sexp with (mode fallback) rule
+  #
+  # Solution: Pre-create these files before running make, so Dune doesn't try
+  # to evaluate the fallback rules during the build.
+  mkdir -p src/client
+  touch src/client/link-opam-manifest.dummy
+  echo "()" > src/client/linking.sexp
+  echo "Pre-created src/client/link-opam-manifest.dummy and linking.sexp for Dune"
 fi
 
 if [[ "${target_platform}" != "linux-"* ]] && [[ "${target_platform}" != "osx-"* ]]; then
