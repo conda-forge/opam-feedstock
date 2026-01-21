@@ -550,11 +550,14 @@ WRAPPER_C_EOF
   # Also create symlinks for other OCaml tools so Dune can find them
   # Dune searches PATH for conda-ocaml-cc.exe but fails to find it
   # Creating symlinks in our wrapper directory ensures Dune finds them
+  # Use ACTUAL_BUILD_PREFIX_MSYS instead of command -v to avoid %BUILD_PREFIX% variables
   for tool in conda-ocaml-cc.exe conda-ocaml-as.exe; do
-    REAL_TOOL=$(command -v "${tool}")
-    if [[ -n "${REAL_TOOL}" ]] && [[ -f "${REAL_TOOL}" ]]; then
+    REAL_TOOL="${ACTUAL_BUILD_PREFIX_MSYS}/Library/bin/${tool}"
+    if [[ -f "${REAL_TOOL}" ]]; then
       ln -sf "${REAL_TOOL}" ".ar_wrapper/${tool}"
       echo "Created symlink for ${tool}: .ar_wrapper/${tool} -> ${REAL_TOOL}"
+    else
+      echo "WARNING: ${REAL_TOOL} not found, skipping symlink creation"
     fi
   done
 
