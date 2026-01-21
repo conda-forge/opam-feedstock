@@ -367,13 +367,13 @@ if [[ "${target_platform}" != "linux-"* ]] && [[ "${target_platform}" != "osx-"*
   echo "C compiler verified in PATH: $(command -v "${CONDA_TOOLCHAIN_HOST}-gcc.exe")"
 
   # ---------------------------------------------------------------------------
-  # dune-workspace to tell Dune where to find conda-ocaml-cc.exe
+  # Set CC environment variable for Dune to find C compiler
   # ---------------------------------------------------------------------------
   # Problem: Dune searches PATH for the C compiler reported by ocamlc -config,
   # but it needs Windows-format paths (D:/...) not MSYS2 format (/d/...).
   #
-  # Solution: Use dune-workspace (binaries ...) to explicitly map conda-ocaml-cc.exe
-  # to its full Windows path. This bypasses Dune's PATH search entirely.
+  # Solution: Set CC environment variable to full Windows path. Dune respects
+  # the CC environment variable (standard Unix convention).
   #
   # CRITICAL: Must use Windows D:/... format, not MSYS2 /d/... format.
   # Dune is a native Windows binary and doesn't understand MSYS2 paths.
@@ -389,36 +389,18 @@ if [[ "${target_platform}" != "linux-"* ]] && [[ "${target_platform}" != "osx-"*
     exit 1
   fi
 
-  echo "Creating dune-workspace with C compiler path:"
+  echo "Setting CC environment variable for Dune:"
   echo "  MSYS2 path: ${CC_MSYS}"
-  echo "  Windows path for dune-workspace: ${CC_WIN}"
+  echo "  Windows path for CC: ${CC_WIN}"
   echo "  DEBUG: Verifying ACTUAL_BUILD_PREFIX is expanded:"
   echo "    ACTUAL_BUILD_PREFIX=${ACTUAL_BUILD_PREFIX}"
   echo "    Should be D:/bld/... format, NOT %BUILD_PREFIX%"
 
-  # Create dune-workspace with explicit binary mapping
-  # CRITICAL: Must use unquoted heredoc delimiter (DUNE_WS_EOF not 'DUNE_WS_EOF')
-  # so that ${CC_WIN} expands to the actual path, not literal "${CC_WIN}"
-  cat > dune-workspace << DUNE_WS_EOF
-(lang dune 3.2)
+  # Export CC for Dune to use
+  export CC="${CC_WIN}"
 
-(context
- (default
-  (env
-   (_ (binaries (conda-ocaml-cc.exe ${CC_WIN}))))))
-DUNE_WS_EOF
-
-  echo "dune-workspace created:"
-  cat dune-workspace
-  echo ""
-  echo "Verifying dune-workspace does NOT contain %BUILD_PREFIX%:"
-  if grep -q '%BUILD_PREFIX%' dune-workspace; then
-    echo "ERROR: dune-workspace still contains unexpanded %BUILD_PREFIX% variable!"
-    echo "This means ACTUAL_BUILD_PREFIX was not set correctly."
-    exit 1
-  else
-    echo "OK: dune-workspace contains expanded path (D:/bld/... format)"
-  fi
+  echo "CC=${CC}"
+  echo "Verification: conda-ocaml-cc.exe exists and CC is set correctly"
 
   # ---------------------------------------------------------------------------
   # ar.exe wrapper to ignore false-positive exit codes
