@@ -1,0 +1,32 @@
+From: Claude AI <noreply@anthropic.com>
+Date: Wed, 15 Jan 2026 00:00:00 +0000
+Subject: [PATCH] Fix Dune which.ml double-.exe bug on Windows
+
+Dune's Which.candidates function blindly appends Bin.exe (".exe" on Windows)
+without checking if the program name already has the .exe extension.
+
+This causes Dune to search for "x86_64-w64-mingw32-gcc.exe.exe" when OCaml's
+config reports "native_c_compiler: x86_64-w64-mingw32-gcc.exe".
+
+Fix: Use Bin.add_exe which checks for existing .exe suffix before appending.
+
+---
+ src/dune_rules/which.ml | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
+
+diff --git a/src/dune_rules/which.ml b/src/dune_rules/which.ml
+index 1234567..abcdefg 100644
+--- a/src/dune_rules/which.ml
++++ b/src/dune_rules/which.ml
+@@ -8,10 +8,11 @@ let with_opt p = p ^ ".opt"
+
+ let candidates =
+-  let make p = p ^ Bin.exe in
++  (* Use Bin.add_exe to avoid double-.exe on Windows *)
++  let make p = Bin.add_exe p in
+   fun prog ->
+     let base = [ make prog ] in
+     if List.mem programs_for_which_we_prefer_opt_ext prog ~equal:String.equal
+     then make (with_opt prog) :: base
+     else base
+ ;;

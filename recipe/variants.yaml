@@ -1,0 +1,14 @@
+c_compiler:
+  - if: not unix
+    then:
+      - gcc
+
+cxx_compiler:
+  - if: not unix
+    then:
+      - gxx
+
+c_stdlib:
+  - if: not unix
+    then:
+      - m2w64-sysroot

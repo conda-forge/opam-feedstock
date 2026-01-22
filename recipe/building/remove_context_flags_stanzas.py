@@ -1,0 +1,80 @@
+#!/usr/bin/env python3
+"""
+Remove context_flags-related stanzas from mccs dune files.
+
+For macOS cross-compilation, we pre-generate the sexp files that context_flags.exe
+would produce, then remove the dune rules that would build and run context_flags.exe
+(which would fail because it's an arm64 binary on x86_64 build machine).
+"""
+import os
+
+
+def remove_context_flags_stanzas(dune_path):
+    """Remove executable and rule stanzas related to context_flags from dune file."""
+    if not os.path.exists(dune_path):
+        print(f"  Skipping (not found): {dune_path}")
+        return
+
+    with open(dune_path, 'r') as f:
+        content = f.read()
+
+    # Parse S-expressions and filter out context_flags-related ones
+    result = []
+    i = 0
+    removed_count = 0
+
+    while i < len(content):
+        # Preserve whitespace
+        if content[i] in ' \t\n':
+            result.append(content[i])
+            i += 1
+            continue
+
+        # Preserve comments
+        if content[i] == ';':
+            while i < len(content) and content[i] != '\n':
+                result.append(content[i])
+                i += 1
+            continue
+
+        # Parse S-expression
+        if content[i] == '(':
+            depth = 1
+            start = i
+            i += 1
+            while i < len(content) and depth > 0:
+                if content[i] == '(':
+                    depth += 1
+                elif content[i] == ')':
+                    depth -= 1
+                i += 1
+            sexp = content[start:i]
+
+            # Check if this is a context_flags related stanza
+            if 'context_flags' in sexp:
+                # Replace with comment showing what was removed
+                first_line = sexp.split('\n')[0][:60]
+                result.append(f'; DISABLED for cross-compilation: {first_line}...\n')
+                removed_count += 1
+            else:
+                result.append(sexp)
+        else:
+            result.append(content[i])
+            i += 1
+
+    with open(dune_path, 'w') as f:
+        f.write(''.join(result))
+
+    print(f"  Rewrote: {dune_path} (removed {removed_count} stanzas)")
+
+
+def main():
+    src_dir = os.environ.get('SRC_DIR', '.')
+
+    print("Removing context_flags stanzas from mccs dune files...")
+    remove_context_flags_stanzas(f"{src_dir}/src_ext/mccs/src/dune")
+    remove_context_flags_stanzas(f"{src_dir}/src_ext/mccs/src/glpk/dune")
+
+
+if __name__ == '__main__':
+    main()
