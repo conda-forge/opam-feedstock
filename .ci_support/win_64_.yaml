@@ -12,5 +12,3 @@ cxx_compiler:
 - gxx
 target_platform:
 - win-64
-zstd:
-- '1.5'

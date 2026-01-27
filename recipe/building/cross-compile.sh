@@ -1,3 +1,8 @@
+if is_linux_cross; then
+  export CFLAGS="-ftree-vectorize -fPIC -fstack-protector-strong -fno-plt -O3 -pipe -isystem $PREFIX/include"
+  export LDFLAGS="-Wl,-O2 -Wl,--sort-common -Wl,--as-needed -Wl,-z,relro -Wl,-z,now -Wl,--allow-shlib-undefined -Wl,-rpath,$PREFIX/lib -Wl,-rpath-link,$PREFIX/lib -L$PREFIX/lib"
+fi
+
 # Configure for cross-compilation with explicit cross-compiler
 ./configure \
    --build="${CONDA_TOOLCHAIN_BUILD}" \
@@ -203,6 +208,8 @@ echo "=== PHASE 4: Manual Installation ==="
 # ==========================================================================
 # opam-installer cannot run on build machine, so we install manually.
 # ==========================================================================
+
+mkdir -p "${OPAM_INSTALL_PREFIX}/bin"
 
 OPAM_BIN="${SRC_DIR}/_build/install/default/bin/opam"
 if [[ -f "${OPAM_BIN}" ]]; then

@@ -1,19 +1,20 @@
 context:
-  name: ocaml
+  name: opam
   version: 2.5.0
   library: ${{ "Library/" if not unix }}
   m2: ${{ "m2-" if not unix }}
+  sh: ${{ "sh" if unix else "bat" }}
 
 package:
-  name: opam
+  name: ${{ name }}
   version: ${{ version }}
 
 source:
-  - url: https://github.com/ocaml/opam/releases/download/${{ version }}/opam-full-${{ version }}.tar.gz
+  - url: https://github.com/ocaml/${{ name }}/releases/download/${{ version }}/${{ name }}-full-${{ version }}.tar.gz
     sha256: 25fb98f962c4227c1261e142afc68a416778e6e819600bd5ee3ec4a18ae1e238
 
 build:
-  number: 0
+  number: 1
 
 requirements:
   build:
@@ -36,6 +37,7 @@ requirements:
         # OCaml compiler has zstd paths embedded from its build environment.
         # We need zstd in build env so those paths resolve correctly.
         - file
+        - unzip
         - zstd
       else:
         - ${{ m2 }}coreutils
@@ -46,21 +48,61 @@ requirements:
         - lld
         - llvm-tools
   host:
-    - zstd
-    # We need to 2-phase as these do not exist yet for arm64 and non-unix
-    # We add opam bare for all archs, then later we update below
-    # - ocamlbuild
-    # - ocaml-findlib
+  - if: aarch64 or ppc64le
+    then:
+      - zstd
+  run:
+    - c-compiler
+    - curl
+    - git
+    - if: unix
+      then:
+        - make
+        - rsync
+        - unzip
+    - if: linux
+      then:
+        - bubblewrap
+      # Once we have ocaml 5.4.0_1
+      # - ocaml-compiler
 
 tests:
   - package_contents:
+      strict: true
       bin:
         - opam
         - opam-installer
       files:
-        - if: build_platform == target_platform
+        - ${{ library }}share/man/man1/opam*
+        - etc/conda/activate.d/opam-activate.${{ sh }}
+        - etc/conda/deactivate.d/opam-deactivate.${{ sh }}
+        - ${{ library }}share/opam/conda/.opam-switch/environment
+        - ${{ library }}share/opam/conda/.opam-switch/lock
+        - ${{ library }}share/opam/conda/.opam-switch/switch-config
+        - ${{ library }}share/opam/config
+        - ${{ library }}share/opam/config.lock
+        - ${{ library }}share/opam/lock
+        - ${{ library }}share/opam/opam-init/complete.sh
+        - ${{ library }}share/opam/opam-init/complete.zsh
+        - ${{ library }}share/opam/opam-init/hooks/sandbox.sh
+        - ${{ library }}share/opam/opam-init/hooks/sandbox.sh.hash
+        - ${{ library }}share/opam/opam-init/init.cmd
+        - ${{ library }}share/opam/opam-init/init.csh
+        - ${{ library }}share/opam/opam-init/init.fish
+        - ${{ library }}share/opam/opam-init/init.ps1
+        - ${{ library }}share/opam/opam-init/init.sh
+        - ${{ library }}share/opam/opam-init/init.zsh
+        - ${{ library }}share/opam/opam-init/variables.cmd
+        - ${{ library }}share/opam/opam-init/variables.csh
+        - ${{ library }}share/opam/opam-init/variables.fish
+        - ${{ library }}share/opam/opam-init/variables.ps1
+        - ${{ library }}share/opam/opam-init/variables.sh
+        - ${{ library }}share/opam/repo/default/repo
+        - ${{ library }}share/opam/repo/lock
+        - ${{ library }}share/opam/repo/repos-config
+        - if: unix and build_platform == target_platform
           then:
-            - ${{ library }}share/man/man1/opam*
+            - ${{ library }}share/opam/conda/.opam-switch/packages/cache
 
   - script:
       - if: build_platform == target_platform
@@ -80,8 +122,9 @@ tests:
       - if: unix and build_platform == target_platform
         then: |
           export OPAMROOT=./opam_test
+          export OPAMSWITCH=
           mkdir -p opam_test
-          opam init --bare --no-setup --bypass-checks
+          opam init --bare --no-setup --bypass-checks --disable-sandboxing
           opam config list
           opam switch create test --empty
           eval $(opam env --switch=test)
@@ -107,6 +150,38 @@ tests:
             opam switch list
             opam switch remove test --yes
             Remove-Item -Recurse -Force opam_test
+
+  # Activation script integration tests
+  # Conda runs activate.d scripts automatically before tests, so env vars
+  # should already be set. The opam root is pre-initialized at build time.
+  - script:
+      - if: unix and build_platform == target_platform
+        then: |
+          # Verify activation set correct env vars
+          test "$OPAMROOT" = "$CONDA_PREFIX/share/opam"
+          test "$OPAMSWITCH" = "conda"
+          test "$OPAMNOENVNOTICE" = "true"
+          # Verify pre-initialized opam root
+          test -d "$OPAMROOT"
+          test -d "$OPAMROOT/conda/.opam-switch"
+          # Verify opam recognizes the switch
+          opam switch list | grep conda
+      - if: unix and build_platform != target_platform
+        then: |
+          echo "Skipping activation tests (cross-compile)"
+  - script:
+      - if: win
+        then:
+          content: |
+            REM Verify activation set correct env vars (conda ran activate.bat automatically)
+            if not "%OPAMROOT%"=="%CONDA_PREFIX%\share\opam" exit /b 1
+            if not "%OPAMSWITCH%"=="conda" exit /b 1
+            if not "%OPAMNOENVNOTICE%"=="true" exit /b 1
+            REM Verify pre-initialized opam root
+            if not exist "%OPAMROOT%" exit /b 1
+            if not exist "%OPAMROOT%\conda\.opam-switch" exit /b 1
+            REM Verify opam sees the switch
+            opam switch list | findstr "conda" >nul || exit /b 1
 
 about:
   homepage: https://github.com/ocaml/opam

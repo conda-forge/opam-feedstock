@@ -1,0 +1,26 @@
+@echo off
+REM Conda deactivation script for opam (Windows)
+
+REM Restore or unset OPAMROOT
+if defined _CONDA_OPAM_SAVED_OPAMROOT (
+    set "OPAMROOT=%_CONDA_OPAM_SAVED_OPAMROOT%"
+    set "_CONDA_OPAM_SAVED_OPAMROOT="
+) else (
+    set "OPAMROOT="
+)
+
+REM Restore or unset OPAMSWITCH
+if defined _CONDA_OPAM_SAVED_OPAMSWITCH (
+    set "OPAMSWITCH=%_CONDA_OPAM_SAVED_OPAMSWITCH%"
+    set "_CONDA_OPAM_SAVED_OPAMSWITCH="
+) else (
+    set "OPAMSWITCH="
+)
+
+REM Restore or unset OPAMNOENVNOTICE
+if defined _CONDA_OPAM_SAVED_OPAMNOENVNOTICE (
+    set "OPAMNOENVNOTICE=%_CONDA_OPAM_SAVED_OPAMNOENVNOTICE%"
+    set "_CONDA_OPAM_SAVED_OPAMNOENVNOTICE="
+) else (
+    set "OPAMNOENVNOTICE="
+)

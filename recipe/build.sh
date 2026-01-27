@@ -47,13 +47,13 @@ if is_cross_compile; then
 
   source "${RECIPE_DIR}"/building/cross-compile.sh
 else
-  ./configure --prefix="${OPAM_INSTALL_PREFIX}" --with-vendored-deps || { cat config.log; exit 1; }
+  ./configure --prefix="${OPAM_INSTALL_PREFIX}" --with-vendored-deps > /dev/null 2>&1 || { cat config.log; exit 1; }
 
   # ==============================================================================
   # Windows: Dune workarounds
   # ==============================================================================
 
-  if is_windows; then
+  if is_non_unix; then
     apply_windows_workarounds
     patch -p1 -d src_ext/dune-local < "${RECIPE_DIR}/patches/xxxx-fix-dune-which-double-exe-on-windows.patch"
   fi
@@ -65,5 +65,45 @@ else
   make
   make install
 fi
+
+echo "=== PHASE 4: Install Activation Scripts ==="
+# Install conda activation/deactivation scripts for opam integration
+ACTIVATE_DIR="${PREFIX}/etc/conda/activate.d"
+DEACTIVATE_DIR="${PREFIX}/etc/conda/deactivate.d"
+mkdir -p "${ACTIVATE_DIR}" "${DEACTIVATE_DIR}"
+
+if is_linux || is_macos; then
+  cp "${RECIPE_DIR}/activation/activate.sh" "${ACTIVATE_DIR}/opam-activate.sh"
+  cp "${RECIPE_DIR}/activation/deactivate.sh" "${DEACTIVATE_DIR}/opam-deactivate.sh"
+else
+  cp "${RECIPE_DIR}/activation/activate.bat" "${ACTIVATE_DIR}/opam-activate.bat"
+  cp "${RECIPE_DIR}/activation/deactivate.bat" "${DEACTIVATE_DIR}/opam-deactivate.bat"
+fi
+
+echo "=== PHASE 5: Initialize opam root ==="
+OPAMROOT="${OPAM_INSTALL_PREFIX}/share/opam"
+
+if is_cross_compile || is_non_unix; then
+  # Cross-compile: can't run target opam binary on build machine (QEMU segfaults
+  # with OCaml 5.x GC). Windows: opam init fails with "Unix infrastructure" error.
+  # Create the opam root structure manually instead.
+  source "${RECIPE_DIR}/building/opam_root_init.sh"
+  create_opam_root "${OPAMROOT}" "${OPAM_INSTALL_PREFIX}"
+else
+  # Native Unix build: use the just-installed opam binary.
+  OPAM_NATIVE="${OPAM_INSTALL_PREFIX}/bin/opam"
+
+  # Create an empty local repo to avoid downloading the full opam-repository index.
+  # Users add their own repos with `opam repository add`.
+  EMPTY_REPO="${SRC_DIR}/_empty_repo"
+  mkdir -p "${EMPTY_REPO}"
+
+  "${OPAM_NATIVE}" init --bare --no-setup --disable-sandboxing --no-opamrc --bypass-checks \
+    --root "${OPAMROOT}" default "${EMPTY_REPO}" --kind local
+  "${OPAM_NATIVE}" switch create conda --empty --root "${OPAMROOT}"
+fi
+
+# Remove binary caches — they contain non-relocatable paths and opam regenerates them.
+find "${OPAMROOT}" -name "*.cache" -type f -delete
 
 echo "=== Build Complete ==="
