@@ -27,7 +27,8 @@ readonly SAVED_PARSERS_DIR="${SRC_DIR}/_saved_parsers"
 # Platform detection
 is_macos() { [[ "${target_platform}" == "osx-"* ]]; }
 is_linux() { [[ "${target_platform}" == "linux-"* ]]; }
-is_windows() { [[ "${target_platform}" != "linux-"* ]] && [[ "${target_platform}" != "osx-"* ]]; }
+is_linux_cross() { [[ "${target_platform}" == *"-aarch64" ]] || [[ "${target_platform}" == *"-ppc64le" ]] || [[ "${target_platform}" == *"-riscv64" ]]; }
+is_non_unix() { [[ "${target_platform}" != "linux-"* ]] && [[ "${target_platform}" != "osx-"* ]]; }
 is_cross_compile() { [[ "${CONDA_BUILD_CROSS_COMPILATION:-}" == "1" ]]; }
 build_is_macos() { [[ "${build_platform:-${target_platform}}" == "osx-"* ]]; }
 
@@ -330,7 +331,7 @@ clear_build_caches() {
 
 # Apply Windows-specific workarounds for Dune build system
 # Dune on Windows doesn't properly handle conditional rules during analysis phase.
-apply_windows_workarounds() {
+apply_non_unix_workarounds() {
   echo "=== Applying Windows Build Workarounds ==="
 
   EXPECTED_CC=$(ocamlc -config | grep "^c_compiler:" | awk '{print $2}')

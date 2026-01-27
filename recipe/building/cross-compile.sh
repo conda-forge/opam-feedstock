@@ -1,10 +1,15 @@
+if is_linux_cross; then
+  export CFLAGS="-ftree-vectorize -fPIC -fstack-protector-strong -fno-plt -O3 -pipe -isystem $PREFIX/include"
+  export LDFLAGS="-Wl,-O2 -Wl,--sort-common -Wl,--as-needed -Wl,-z,relro -Wl,-z,now -Wl,--allow-shlib-undefined -Wl,-rpath,$PREFIX/lib -Wl,-rpath-link,$PREFIX/lib -L$PREFIX/lib"
+fi
+
 # Configure for cross-compilation with explicit cross-compiler
 ./configure \
    --build="${CONDA_TOOLCHAIN_BUILD}" \
    --host="${CONDA_TOOLCHAIN_HOST}" \
    --prefix="${OPAM_INSTALL_PREFIX}" \
    --with-vendored-deps \
-   2>&1 || { cat config.log; exit 1; }
+   > /dev/null 2>&1 || { cat config.log; exit 1; }
 
 # ==========================================================================
 echo "=== PHASE 1: Build Native Tools ==="
@@ -29,10 +34,10 @@ echo "=== PHASE 1: Build Native Tools ==="
   # Build cppo preprocessor using dune directly - must be native to run during build
   DUNE="${SRC_DIR}/src_ext/dune-local/_boot/dune.exe"
   echo "Building cppo with: ${DUNE}"
-  (cd "${SRC_DIR}/src_ext/cppo" && "${DUNE}" build --root . src/cppo_main.exe 2>&1 || { echo "CPPO BUILD FAILED"; exit 1; })
+  (cd "${SRC_DIR}/src_ext/cppo" && "${DUNE}" build --root . src/cppo_main.exe > /dev/null 2>&1 || { echo "CPPO BUILD FAILED"; exit 1; })
 
   echo "Building menhir (@install targets) with: ${DUNE}"
-  (cd "${SRC_DIR}/src_ext/menhir" && "${DUNE}" build --root . @install 2>&1 || { echo "MENHIR BUILD FAILED"; exit 1; })
+  (cd "${SRC_DIR}/src_ext/menhir" && "${DUNE}" build --root . @install > /dev/null 2>&1 || { echo "MENHIR BUILD FAILED"; exit 1; })
 
   # Pre-generate menhir's own stage2 parser files and copy to source directory
   NATIVE_MENHIR="${SRC_DIR}/src_ext/menhir/_build/default/src/stage2/main.exe"
@@ -149,7 +154,7 @@ grep -rl 'menhir' "${SRC_DIR}/src_ext" "${SRC_DIR}/src" --include='dune' 2>/dev/
 
 for dune_file in $(find "${SRC_DIR}/src_ext" "${SRC_DIR}/src" -name 'dune' -type f 2>/dev/null); do
   if grep -q 'menhir' "$dune_file"; then
-    echo "PATCHING: $dune_file"
+    # echo "PATCHING: $dune_file"
     python3 "${RECIPE_DIR}/building/remove_menhir_stanzas.py" "$dune_file"
     if grep -q '^(menhir' "$dune_file"; then
       echo "  WARNING: menhir stanza still present after patching!"
@@ -203,6 +208,8 @@ echo "=== PHASE 4: Manual Installation ==="
 # ==========================================================================
 # opam-installer cannot run on build machine, so we install manually.
 # ==========================================================================
+
+mkdir -p "${OPAM_INSTALL_PREFIX}/bin"
 
 OPAM_BIN="${SRC_DIR}/_build/install/default/bin/opam"
 if [[ -f "${OPAM_BIN}" ]]; then

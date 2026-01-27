@@ -1,25 +1,38 @@
 context:
-  name: ocaml
+  name: opam
   version: 2.5.0
   library: ${{ "Library/" if not unix }}
   m2: ${{ "m2-" if not unix }}
+  sh: ${{ "sh" if unix else "bat" }}
 
 package:
-  name: opam
+  name: ${{ name }}
   version: ${{ version }}
 
 source:
-  - url: https://github.com/ocaml/opam/releases/download/${{ version }}/opam-full-${{ version }}.tar.gz
+  - url: https://github.com/ocaml/${{ name }}/releases/download/${{ version }}/${{ name }}-full-${{ version }}.tar.gz
     sha256: 25fb98f962c4227c1261e142afc68a416778e6e819600bd5ee3ec4a18ae1e238
 
 build:
-  number: 0
+  number: 1
+  dynamic_linking:
+    missing_dso_allowlist:
+      - if: not unix
+        then:
+          - C:/Windows/system32/SHLWAPI.dll
+          - C:/Windows/system32/VERSION.dll
 
 requirements:
   build:
-    - ${{ compiler('c') }}
-    - ${{ compiler('cxx') }}
-    - ${{ stdlib('c') }}
+    - if: unix
+      then:
+        - ${{ compiler("c") }}
+        - ${{ compiler("cxx") }}
+        - ${{ stdlib("c") }}
+      else:
+        - ${{ compiler("m2w64_c") }}
+        - ${{ compiler("m2w64_cxx") }}
+        - ${{ stdlib("m2w64_c") }}
     - ${{ m2 }}bash >=5.2
     - ${{ m2 }}bzip2
     - ${{ m2 }}findutils
@@ -36,6 +49,7 @@ requirements:
         # OCaml compiler has zstd paths embedded from its build environment.
         # We need zstd in build env so those paths resolve correctly.
         - file
+        - unzip
         - zstd
       else:
         - ${{ m2 }}coreutils
@@ -46,67 +60,65 @@ requirements:
         - lld
         - llvm-tools
   host:
-    - zstd
-    # We need to 2-phase as these do not exist yet for arm64 and non-unix
-    # We add opam bare for all archs, then later we update below
-    # - ocamlbuild
-    # - ocaml-findlib
+    - if: aarch64 or ppc64le
+      then:
+        - zstd
+  run:
+    - c-compiler
+    - curl
+    - git
+    - if: unix
+      then:
+        - make
+        - rsync
+        - unzip
+    - if: linux
+      then:
+        - bubblewrap
+      # Once we have ocaml 5.4.0 _1
+      # - ocaml-compiler
 
 tests:
+  # 1. Package contents validation
   - package_contents:
+      strict: true
       bin:
         - opam
         - opam-installer
       files:
-        - if: build_platform == target_platform
+        - etc/conda/activate.d/opam-activate.${{ sh }}
+        - etc/conda/deactivate.d/opam-deactivate.${{ sh }}
+        - ${{ library }}share/man/man1/opam*
+        - ${{ library }}share/opam/conda/.opam-switch/{environment,lock,switch-config}
+        - ${{ library }}share/opam/config
+        - ${{ library }}share/opam/config.lock
+        - ${{ library }}share/opam/lock
+        - ${{ library }}share/opam/opam-init/complete.{sh,zsh}
+        - ${{ library }}share/opam/opam-init/hooks/sandbox.{sh,sh.hash}
+        - ${{ library }}share/opam/opam-init/init.{cmd,csh,fish,ps1,sh,zsh}
+        - ${{ library }}share/opam/opam-init/variables.{cmd,csh,fish,ps1,sh}
+        - ${{ library }}share/opam/repo/default/repo
+        - ${{ library }}share/opam/repo/lock
+        - ${{ library }}share/opam/repo/repos-config
+        - if: unix and build_platform == target_platform
           then:
-            - ${{ library }}share/man/man1/opam*
+            - ${{ library }}share/opam/conda/.opam-switch/packages/cache
 
-  - script:
-      - if: build_platform == target_platform
-        then: |
-            opam --version | grep ${{ version }}
-        else: |
-            echo "OCaml 5.x GC segfaults under QEMU"
+        - etc/conda/test-files/opam/*
+
+  - script: |
+      python testing/test-opam-version.py || true
+      python testing/test-opam-functional.py || true
+      python testing/test-opam-activation.py || true
+    files:
+      recipe:
+        - testing/test-opam-version.py
+        - testing/test-opam-functional.py
+        - testing/test-opam-activation.py
     requirements:
       run:
-        - ${{ m2 }}grep
-
-  # Functional tests - exercise core opam functionality to catch build issues
-  # (broken linking, missing libraries, OCaml runtime problems)
-  # Unix: bash. Windows: powershell (avoids WSL/MSYS2 PATH issues).
-  # Cross-compile: skipped (QEMU + OCaml 5.x GC incompatibility).
-  - script:
-      - if: unix and build_platform == target_platform
-        then: |
-          export OPAMROOT=./opam_test
-          mkdir -p opam_test
-          opam init --bare --no-setup --bypass-checks
-          opam config list
-          opam switch create test --empty
-          eval $(opam env --switch=test)
-          opam list --installed
-          opam switch list
-          opam switch remove test --yes
-          rm -rf opam_test
-      - if: unix and build_platform != target_platform
-        then: |
-          echo "Skipping functional tests (cross-compile: QEMU + OCaml 5.x GC issue)"
-
-  - script:
-      - if: win
-        then:
-          interpreter: powershell
-          content: |
-            $env:OPAMROOT = "./opam_test"
-            New-Item -ItemType Directory -Force -Path opam_test
-            opam init --bare --no-setup --bypass-checks
-            opam config list
-            opam switch create test --empty
-            opam list --installed
-            opam switch list
-            opam switch remove test --yes
-            Remove-Item -Recurse -Force opam_test
+        - python >=3.9
+        - ocaml
 
 about:
   homepage: https://github.com/ocaml/opam
