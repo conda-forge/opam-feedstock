@@ -1,7 +1,83 @@
-About opam-feedstock
+About cppo-feedstock
 ====================
 
-Feedstock license: [BSD-3-Clause](https://github.com/conda-forge/opam-feedstock/blob/main/LICENSE.txt)
+Feedstock license: [BSD-3-Clause](https://github.com/conda-forge/opam-feedstock-unix-feedstock/blob/main/LICENSE.txt)
+
+
+About cppo
+----------
+
+Home: https://github.com/ocaml-community/cppo
+
+Package license: BSD-3-Clause
+
+Summary: C preprocessor for OCaml
+
+Development: https://github.com/ocaml-community/cppo
+
+opam is a source-based package manager. It supports multiple simultaneous compiler
+installations, flexible package constraints, and a Git-friendly development workflow.
+
+About dune
+----------
+
+Home: https://dune.build/
+
+Package license: MIT
+
+Summary: A composable build system for OCaml.
+
+Development: https://github.com/ocaml/dune
+
+opam is a source-based package manager. It supports multiple simultaneous compiler
+installations, flexible package constraints, and a Git-friendly development workflow.
+
+About menhir
+------------
+
+Home: https://gitlab.inria.fr/fpottier/menhir
+
+Package license: GPL-2.0-only
+
+Summary: An LR(1) parser generator for OCaml
+
+Development: https://gitlab.inria.fr/fpottier/menhir
+
+opam is a source-based package manager. It supports multiple simultaneous compiler
+installations, flexible package constraints, and a Git-friendly development workflow.
+
+About opam
+----------
+
+Home: https://github.com/ocaml/opam
+
+Package license: LGPL-2.1-only
+
+Summary: Objective Caml (OCaml) is an implementation of the ML language.
+
+Development: https://github.com/ocaml/opam
+
+opam is a source-based package manager. It supports multiple simultaneous compiler
+installations, flexible package constraints, and a Git-friendly development workflow.
+
+About opam-ocaml-findlib
+------------------------
+
+Home: http://projects.camlcity.org/projects/findlib.html
+
+Package license: MIT
+
+Summary: opam is a source-based package manager for OCaml
+
+Development: https://github.com/ocaml/opam
+
+Documentation: http://projects.camlcity.org/projects/dl/findlib-%7B%7B%20version%20%7D%7D/doc/guide-html/index.html
+
+opam is a source-based package manager. It supports multiple simultaneous compiler
+installations, flexible package constraints, and a Git-friendly development workflow.
+
+About opam-ocamlbuild
+---------------------
 
 Home: https://github.com/ocaml/opam
 
@@ -25,8 +101,8 @@ Current build status
     <td>
       <details>
         <summary>
-          <a href="https://dev.azure.com/conda-forge/feedstock-builds/_build/latest?definitionId=15649&branchName=main">
-            <img src="https://dev.azure.com/conda-forge/feedstock-builds/_apis/build/status/opam-feedstock?branchName=main">
+          <a href="https://dev.azure.com/conda-forge/feedstock-builds/_build/latest?definitionId=None&branchName=main">
+            <img src="https://dev.azure.com/conda-forge/feedstock-builds/_apis/build/status/opam-feedstock-unix-feedstock?branchName=main">
           </a>
         </summary>
         <table>
@@ -34,43 +110,43 @@ Current build status
           <tbody><tr>
               <td>linux_64</td>
               <td>
-                <a href="https://dev.azure.com/conda-forge/feedstock-builds/_build/latest?definitionId=15649&branchName=main">
-                  <img src="https://dev.azure.com/conda-forge/feedstock-builds/_apis/build/status/opam-feedstock?branchName=main&jobName=linux&configuration=linux%20linux_64_" alt="variant">
+                <a href="https://dev.azure.com/conda-forge/feedstock-builds/_build/latest?definitionId=None&branchName=main">
+                  <img src="https://dev.azure.com/conda-forge/feedstock-builds/_apis/build/status/opam-feedstock-unix-feedstock?branchName=main&jobName=linux&configuration=linux%20linux_64_" alt="variant">
                 </a>
               </td>
             </tr><tr>
               <td>linux_aarch64</td>
               <td>
-                <a href="https://dev.azure.com/conda-forge/feedstock-builds/_build/latest?definitionId=15649&branchName=main">
-                  <img src="https://dev.azure.com/conda-forge/feedstock-builds/_apis/build/status/opam-feedstock?branchName=main&jobName=linux&configuration=linux%20linux_aarch64_" alt="variant">
+                <a href="https://dev.azure.com/conda-forge/feedstock-builds/_build/latest?definitionId=None&branchName=main">
+                  <img src="https://dev.azure.com/conda-forge/feedstock-builds/_apis/build/status/opam-feedstock-unix-feedstock?branchName=main&jobName=linux&configuration=linux%20linux_aarch64_" alt="variant">
                 </a>
               </td>
             </tr><tr>
               <td>linux_ppc64le</td>
               <td>
-                <a href="https://dev.azure.com/conda-forge/feedstock-builds/_build/latest?definitionId=15649&branchName=main">
-                  <img src="https://dev.azure.com/conda-forge/feedstock-builds/_apis/build/status/opam-feedstock?branchName=main&jobName=linux&configuration=linux%20linux_ppc64le_" alt="variant">
+                <a href="https://dev.azure.com/conda-forge/feedstock-builds/_build/latest?definitionId=None&branchName=main">
+                  <img src="https://dev.azure.com/conda-forge/feedstock-builds/_apis/build/status/opam-feedstock-unix-feedstock?branchName=main&jobName=linux&configuration=linux%20linux_ppc64le_" alt="variant">
                 </a>
               </td>
             </tr><tr>
               <td>osx_64</td>
               <td>
-                <a href="https://dev.azure.com/conda-forge/feedstock-builds/_build/latest?definitionId=15649&branchName=main">
-                  <img src="https://dev.azure.com/conda-forge/feedstock-builds/_apis/build/status/opam-feedstock?branchName=main&jobName=osx&configuration=osx%20osx_64_" alt="variant">
+                <a href="https://dev.azure.com/conda-forge/feedstock-builds/_build/latest?definitionId=None&branchName=main">
+                  <img src="https://dev.azure.com/conda-forge/feedstock-builds/_apis/build/status/opam-feedstock-unix-feedstock?branchName=main&jobName=osx&configuration=osx%20osx_64_" alt="variant">
                 </a>
               </td>
             </tr><tr>
               <td>osx_arm64</td>
               <td>
-                <a href="https://dev.azure.com/conda-forge/feedstock-builds/_build/latest?definitionId=15649&branchName=main">
-                  <img src="https://dev.azure.com/conda-forge/feedstock-builds/_apis/build/status/opam-feedstock?branchName=main&jobName=osx&configuration=osx%20osx_arm64_" alt="variant">
+                <a href="https://dev.azure.com/conda-forge/feedstock-builds/_build/latest?definitionId=None&branchName=main">
+                  <img src="https://dev.azure.com/conda-forge/feedstock-builds/_apis/build/status/opam-feedstock-unix-feedstock?branchName=main&jobName=osx&configuration=osx%20osx_arm64_" alt="variant">
                 </a>
               </td>
             </tr><tr>
               <td>win_64</td>
               <td>
-                <a href="https://dev.azure.com/conda-forge/feedstock-builds/_build/latest?definitionId=15649&branchName=main">
-                  <img src="https://dev.azure.com/conda-forge/feedstock-builds/_apis/build/status/opam-feedstock?branchName=main&jobName=win&configuration=win%20win_64_" alt="variant">
+                <a href="https://dev.azure.com/conda-forge/feedstock-builds/_build/latest?definitionId=None&branchName=main">
+                  <img src="https://dev.azure.com/conda-forge/feedstock-builds/_apis/build/status/opam-feedstock-unix-feedstock?branchName=main&jobName=win&configuration=win%20win_64_" alt="variant">
                 </a>
               </td>
             </tr>
@@ -86,53 +162,58 @@ Current release info
 
 | Name | Downloads | Version | Platforms |
 | --- | --- | --- | --- |
+| [![Conda Recipe](https://img.shields.io/badge/recipe-cppo-green.svg)](https://anaconda.org/conda-forge/cppo) | [![Conda Downloads](https://img.shields.io/conda/dn/conda-forge/cppo.svg)](https://anaconda.org/conda-forge/cppo) | [![Conda Version](https://img.shields.io/conda/vn/conda-forge/cppo.svg)](https://anaconda.org/conda-forge/cppo) | [![Conda Platforms](https://img.shields.io/conda/pn/conda-forge/cppo.svg)](https://anaconda.org/conda-forge/cppo) |
+| [![Conda Recipe](https://img.shields.io/badge/recipe-dune-green.svg)](https://anaconda.org/conda-forge/dune) | [![Conda Downloads](https://img.shields.io/conda/dn/conda-forge/dune.svg)](https://anaconda.org/conda-forge/dune) | [![Conda Version](https://img.shields.io/conda/vn/conda-forge/dune.svg)](https://anaconda.org/conda-forge/dune) | [![Conda Platforms](https://img.shields.io/conda/pn/conda-forge/dune.svg)](https://anaconda.org/conda-forge/dune) |
+| [![Conda Recipe](https://img.shields.io/badge/recipe-menhir-green.svg)](https://anaconda.org/conda-forge/menhir) | [![Conda Downloads](https://img.shields.io/conda/dn/conda-forge/menhir.svg)](https://anaconda.org/conda-forge/menhir) | [![Conda Version](https://img.shields.io/conda/vn/conda-forge/menhir.svg)](https://anaconda.org/conda-forge/menhir) | [![Conda Platforms](https://img.shields.io/conda/pn/conda-forge/menhir.svg)](https://anaconda.org/conda-forge/menhir) |
 | [![Conda Recipe](https://img.shields.io/badge/recipe-opam-green.svg)](https://anaconda.org/conda-forge/opam) | [![Conda Downloads](https://img.shields.io/conda/dn/conda-forge/opam.svg)](https://anaconda.org/conda-forge/opam) | [![Conda Version](https://img.shields.io/conda/vn/conda-forge/opam.svg)](https://anaconda.org/conda-forge/opam) | [![Conda Platforms](https://img.shields.io/conda/pn/conda-forge/opam.svg)](https://anaconda.org/conda-forge/opam) |
+| [![Conda Recipe](https://img.shields.io/badge/recipe-opam--ocaml--findlib-green.svg)](https://anaconda.org/conda-forge/opam-ocaml-findlib) | [![Conda Downloads](https://img.shields.io/conda/dn/conda-forge/opam-ocaml-findlib.svg)](https://anaconda.org/conda-forge/opam-ocaml-findlib) | [![Conda Version](https://img.shields.io/conda/vn/conda-forge/opam-ocaml-findlib.svg)](https://anaconda.org/conda-forge/opam-ocaml-findlib) | [![Conda Platforms](https://img.shields.io/conda/pn/conda-forge/opam-ocaml-findlib.svg)](https://anaconda.org/conda-forge/opam-ocaml-findlib) |
+| [![Conda Recipe](https://img.shields.io/badge/recipe-opam--ocamlbuild-green.svg)](https://anaconda.org/conda-forge/opam-ocamlbuild) | [![Conda Downloads](https://img.shields.io/conda/dn/conda-forge/opam-ocamlbuild.svg)](https://anaconda.org/conda-forge/opam-ocamlbuild) | [![Conda Version](https://img.shields.io/conda/vn/conda-forge/opam-ocamlbuild.svg)](https://anaconda.org/conda-forge/opam-ocamlbuild) | [![Conda Platforms](https://img.shields.io/conda/pn/conda-forge/opam-ocamlbuild.svg)](https://anaconda.org/conda-forge/opam-ocamlbuild) |
 
-Installing opam
+Installing cppo
 ===============
 
-Installing `opam` from the `conda-forge` channel can be achieved by adding `conda-forge` to your channels with:
+Installing `cppo` from the `conda-forge` channel can be achieved by adding `conda-forge` to your channels with:
 
 ```
 conda config --add channels conda-forge
 conda config --set channel_priority strict
 ```
 
-Once the `conda-forge` channel has been enabled, `opam` can be installed with `conda`:
+Once the `conda-forge` channel has been enabled, `cppo, dune, menhir, opam, opam-ocaml-findlib, opam-ocamlbuild` can be installed with `conda`:
 
 ```
-conda install opam
-```
-
-or with `mamba`:
-
-```
-mamba install opam
-```
-
-It is possible to list all of the versions of `opam` available on your platform with `conda`:
-
-```
-conda search opam --channel conda-forge
+conda install cppo dune menhir opam opam-ocaml-findlib opam-ocamlbuild
 ```
 
 or with `mamba`:
 
 ```
-mamba search opam --channel conda-forge
+mamba install cppo dune menhir opam opam-ocaml-findlib opam-ocamlbuild
+```
+
+It is possible to list all of the versions of `cppo` available on your platform with `conda`:
+
+```
+conda search cppo --channel conda-forge
+```
+
+or with `mamba`:
+
+```
+mamba search cppo --channel conda-forge
 ```
 
 Alternatively, `mamba repoquery` may provide more information:
 
 ```
 # Search all versions available on your platform:
-mamba repoquery search opam --channel conda-forge
+mamba repoquery search cppo --channel conda-forge
 
-# List packages depending on `opam`:
-mamba repoquery whoneeds opam --channel conda-forge
+# List packages depending on `cppo`:
+mamba repoquery whoneeds cppo --channel conda-forge
 
-# List dependencies of `opam`:
-mamba repoquery depends opam --channel conda-forge
+# List dependencies of `cppo`:
+mamba repoquery depends cppo --channel conda-forge
 ```
 
 
@@ -177,17 +258,17 @@ Terminology
                   produce the finished article (built conda distributions)
 
 
-Updating opam-feedstock
+Updating cppo-feedstock
 =======================
 
-If you would like to improve the opam recipe or build a new
+If you would like to improve the cppo recipe or build a new
 package version, please fork this repository and submit a PR. Upon submission,
 your changes will be run on the appropriate platforms to give the reviewer an
 opportunity to confirm that the changes result in a successful build. Once
 merged, the recipe will be re-built and uploaded automatically to the
 `conda-forge` channel, whereupon the built conda packages will be available for
 everybody to install and use from the `conda-forge` channel.
-Note that all branches in the conda-forge/opam-feedstock are
+Note that all branches in the conda-forge/cppo-feedstock are
 immediately built and any created packages are uploaded, so PRs should be based
 on branches in forks, and branches in the main repository should only be used to
 build distinct package versions.

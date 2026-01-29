@@ -47,6 +47,7 @@ if is_cross_compile; then
 
   source "${RECIPE_DIR}"/building/cross-compile.sh
 else
+  cd "${SRC_DIR}/opam"
   ./configure --prefix="${OPAM_INSTALL_PREFIX}" --with-vendored-deps > /dev/null 2>&1 || { cat config.log; exit 1; }
 
   # ==============================================================================
@@ -55,7 +56,12 @@ else
 
   if is_non_unix; then
     apply_windows_workarounds
-    patch -p1 -d src_ext/dune-local < "${RECIPE_DIR}/patches/xxxx-fix-dune-which-double-exe-on-windows.patch"
+    # Patch vendored dune if it exists (may not exist if using system dune)
+    if [[ -d "src_ext/dune-local" ]]; then
+      patch -p1 -d src_ext/dune-local < "${RECIPE_DIR}/patches/xxxx-fix-dune-which-double-exe-on-windows.patch"
+    else
+      echo "Note: src_ext/dune-local not found, skipping dune patch (using system dune)"
+    fi
   fi
 
   # ==============================================================================
@@ -105,5 +111,6 @@ fi
 
 # Remove binary caches — they contain non-relocatable paths and opam regenerates them.
 find "${OPAMROOT}" -name "*.cache" -type f -delete
+rm -rf "${OPAM_INSTALL_PREFIX}"/share/opam/conda/.opam-switch/packages/cache
 
 echo "=== Build Complete ==="

@@ -10,7 +10,7 @@ create_opam_root() {
   local OPAMROOT="$1"
   local PREFIX="$2"
   local SRC_DIR="${3:-${SRC_DIR}}"
-  local SHELLSCRIPTS="${SRC_DIR}/src/state/shellscripts"
+  local SHELLSCRIPTS="${SRC_DIR}/opam/src/state/shellscripts"
   local USERNAME
   USERNAME="$(id -un 2>/dev/null || echo user)"
   local GROUPNAME

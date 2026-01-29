@@ -227,7 +227,7 @@ configure_cross_environment() {
   export CONDA_OCAML_LD="${CONDA_TOOLCHAIN_HOST}-ld"
 
   echo "    Cross-compiler environment:"
-  echo "      CC=${CC}, CXX=${CXX}, AR=${AR}"
+  echo "      CC=${CC}, CXX=${CXX:-}, AR=${AR}"
   echo "      CONDA_OCAML_CC=${CONDA_OCAML_CC}"
 
   # Set QEMU_LD_PREFIX for binfmt_misc/QEMU to find aarch64 dynamic linker
