@@ -130,3 +130,43 @@ def get_msys2_root():
     """
     conda_prefix = os.environ.get("CONDA_PREFIX", "")
     return os.path.join(conda_prefix, "Library", "usr")
+
+
+def get_ocaml_build_version():
+    """Get the OCaml version that opam was built with.
+
+    Reads from .ocaml-build-version file in OPAMROOT, written during build.
+    Returns version string like "5.3.0" or "unknown" if not found.
+    """
+    opam_root = get_opam_root()
+    version_file = os.path.join(opam_root, ".ocaml-build-version")
+    try:
+        with open(version_file) as f:
+            return f.read().strip()
+    except (FileNotFoundError, IOError):
+        return "unknown"
+
+
+def should_skip_heavy_tests():
+    """Check if heavy tests should be skipped due to OCaml 5.3.0 GC bug.
+
+    OCaml 5.3.0 has heap corruption issues on aarch64/ppc64le that cause
+    crashes during complex operations like `opam init`. This is fixed in 5.4.0.
+
+    Returns:
+        tuple: (should_skip: bool, reason: str)
+    """
+    build_version = get_ocaml_build_version()
+    arch = get_target_arch()
+
+    print(f"OCaml build version: {build_version}")
+    print(f"Target architecture: {arch}")
+
+    if build_version.startswith("5.3.") and arch in ("aarch64", "ppc64le", "arm64"):
+        reason = (
+            f"OCaml {build_version} has GC bugs on {arch} causing heap corruption. "
+            "Heavy tests skipped. Fixed in OCaml 5.4.0."
+        )
+        return True, reason
+
+    return False, ""

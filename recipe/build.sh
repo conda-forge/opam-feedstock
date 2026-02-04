@@ -106,4 +106,9 @@ fi
 # Remove binary caches — they contain non-relocatable paths and opam regenerates them.
 find "${OPAMROOT}" -name "*.cache" -type f -delete
 
+# Record build-time OCaml version for tests to detect OCaml 5.3.0 GC bug workaround
+OCAML_BUILD_VERSION=$(ocaml -version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' || echo "unknown")
+echo "${OCAML_BUILD_VERSION}" > "${OPAMROOT}/.ocaml-build-version"
+echo "Recorded OCaml build version: ${OCAML_BUILD_VERSION}"
+
 echo "=== Build Complete ==="

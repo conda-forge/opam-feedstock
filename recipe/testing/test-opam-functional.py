@@ -10,11 +10,23 @@ import platform
 import shutil
 import sys
 
-from test_utils import apply_ocaml_530_workaround, get_msys2_root, run_cmd
+from test_utils import (
+    apply_ocaml_530_workaround,
+    get_msys2_root,
+    run_cmd,
+    should_skip_heavy_tests,
+)
 
 
 def main():
     print("=== opam functional tests ===")
+
+    # Check if we should skip due to OCaml 5.3.0 GC bug on aarch64/ppc64le
+    skip, reason = should_skip_heavy_tests()
+    if skip:
+        print(f"\n[SKIP] {reason}")
+        print("=== Functional tests skipped (known OCaml bug) ===")
+        return 0
 
     apply_ocaml_530_workaround()
 
