@@ -14,7 +14,7 @@ source:
     sha256: 25fb98f962c4227c1261e142afc68a416778e6e819600bd5ee3ec4a18ae1e238
 
 build:
-  number: 1
+  number: 2
   dynamic_linking:
     missing_dso_allowlist:
       - if: not unix
@@ -43,6 +43,8 @@ requirements:
     - binutils
     - curl
     - git
+    # NOTE: Requires ocaml 5.3.0 build 8+ for correct cross-compiler Makefile.config
+    # and CONDA_OCAML_* environment variables from activation script
     - ocaml >=5.3.0
     - if: unix
       then:
@@ -106,10 +108,11 @@ tests:
 
         - etc/conda/test-files/opam/*
 
+  # Version, functional, and activation tests
   - script: |
-      python testing/test-opam-version.py || true
-      python testing/test-opam-functional.py || true
-      python testing/test-opam-activation.py || true
+      python testing/test-opam-version.py
+      python testing/test-opam-functional.py
+      python testing/test-opam-activation.py
     files:
       recipe:
         - testing/test-opam-version.py
@@ -119,6 +122,20 @@ tests:
       run:
         - python >=3.9
         - ocaml
+
+  # Findlib integration tests - verify full OCaml toolchain works together
+  # - script:
+  #     - if: build_platform == target_platform
+  #       then: python testing/test-findlib-integration.py
+  #       else: echo "Skipping findlib tests (cross-compile)"
+  #   files:
+  #     recipe:
+  #       - testing/test-findlib-integration.py
+  #   requirements:
+  #     run:
+  #       - python >=3.9
+  #       - ocaml
+  #       - ocaml-findlib
 
 about:
   homepage: https://github.com/ocaml/opam

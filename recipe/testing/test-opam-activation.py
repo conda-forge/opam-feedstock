@@ -38,8 +38,10 @@ def apply_ocaml_530_workaround():
     print(f"Architecture: {arch}")
 
     if ocaml_version.startswith("5.3.") and arch in ("aarch64", "ppc64le", "arm64"):
-        print("Applying OCaml 5.3.0 GC workaround (s=16M)")
-        os.environ["OCAMLRUNPARAM"] = "s=16M"
+        # OCaml 5.3.0 has heap corruption issues on aarch64/ppc64le under QEMU.
+        gc_params = "s=128M,H=256M,o=200"
+        print(f"Applying OCaml 5.3.0 GC workaround ({gc_params})")
+        os.environ["OCAMLRUNPARAM"] = gc_params
 
     print(f"OCAMLRUNPARAM: {os.environ.get('OCAMLRUNPARAM', '<default>')}")
 
@@ -73,9 +75,12 @@ def main():
         print("[FAIL] CONDA_PREFIX not set - not running in conda environment")
         return 1
 
-    # Platform-specific path separator
-    sep = "\\" if platform.system() == "Windows" else "/"
-    expected_root = f"{conda_prefix}{sep}share{sep}opam"
+    # Platform-specific paths
+    # Windows: conda packages install to Library\share, not share
+    if platform.system() == "Windows":
+        expected_root = os.path.join(conda_prefix, "Library", "share", "opam")
+    else:
+        expected_root = os.path.join(conda_prefix, "share", "opam")
 
     print("\n--- Test: environment variables ---")
     print(f"CONDA_PREFIX: {conda_prefix}")

@@ -213,8 +213,13 @@ setup_cross_c_compilers() {
 configure_cross_environment() {
   echo "  Configuring cross-compilation environment variables..."
 
-  # For conda-ocaml-cc wrapper (Dune reads c_compiler from ocamlc -config)
+  # Override CONDA_OCAML_* for cross-compilation.
+  # The ocaml activation script sets these to BUILD compiler, but for cross-compile
+  # we need them pointing to TARGET compiler so Dune builds C stubs correctly.
   export CONDA_OCAML_CC="$(get_target_c_compiler)"
+  export CONDA_OCAML_AR="${CONDA_TOOLCHAIN_HOST}-ar"
+  export CONDA_OCAML_AS="${CONDA_TOOLCHAIN_HOST}-as"
+  export CONDA_OCAML_LD="${CONDA_TOOLCHAIN_HOST}-ld"
   if is_macos; then
     export CONDA_OCAML_MKEXE="${CONDA_OCAML_CC}"
     export CONDA_OCAML_MKDLL="${CONDA_OCAML_CC} -dynamiclib"
@@ -222,11 +227,8 @@ configure_cross_environment() {
     export CONDA_OCAML_MKEXE="${CONDA_OCAML_CC} -Wl,-E -ldl"
     export CONDA_OCAML_MKDLL="${CONDA_OCAML_CC} -shared"
   fi
-  export CONDA_OCAML_AR="${CONDA_TOOLCHAIN_HOST}-ar"
-  export CONDA_OCAML_AS="${CONDA_TOOLCHAIN_HOST}-as"
-  export CONDA_OCAML_LD="${CONDA_TOOLCHAIN_HOST}-ld"
 
-  echo "    Cross-compiler environment:"
+  echo "    Cross-compiler environment (overriding ocaml activation):"
   echo "      CC=${CC}, CXX=${CXX}, AR=${AR}"
   echo "      CONDA_OCAML_CC=${CONDA_OCAML_CC}"
 
@@ -282,27 +284,7 @@ patch_dune_for_cross() {
   echo "    Native menhir available at: $(which menhir)"
 }
 
-patch_ocaml_makefile_config() {
-  echo "  Patching OCaml Makefile.config for target architecture..."
-  local ocaml_lib=$(ocamlc -where)
-  local ocaml_config="${ocaml_lib}/Makefile.config"
-
-  if [[ -f "${ocaml_config}" ]]; then
-    echo "    Patching: ${ocaml_config}"
-    cp "${ocaml_config}" "${ocaml_config}.bak"
-    local target_cc="$(get_target_c_compiler)"
-    sed -i "s|^CC=.*|CC=${target_cc}|" "${ocaml_config}"
-    sed -i "s|^NATIVE_C_COMPILER=.*|NATIVE_C_COMPILER=${target_cc}|" "${ocaml_config}"
-    sed -i "s|^BYTECODE_C_COMPILER=.*|BYTECODE_C_COMPILER=${target_cc}|" "${ocaml_config}"
-    sed -i "s|^PACKLD=.*|PACKLD=${CONDA_TOOLCHAIN_HOST}-ld -r -o \$(EMPTY)|" "${ocaml_config}"
-    sed -i "s|^ASM=.*|ASM=${CONDA_TOOLCHAIN_HOST}-as|" "${ocaml_config}"
-    sed -i "s|^TOOLPREF=.*|TOOLPREF=${CONDA_TOOLCHAIN_HOST}-|" "${ocaml_config}"
-    echo "    Patched config entries:"
-    grep -E "^(CC|NATIVE_C_COMPILER|BYTECODE_C_COMPILER|PACKLD|ASM|TOOLPREF)=" "${ocaml_config}"
-  else
-    echo "    WARNING: OCaml Makefile.config not found at ${ocaml_config}"
-  fi
-}
+# REMOVED: patch_ocaml_makefile_config() - ocaml 5.3.0 _8+ provides correct Makefile.config for cross-compilers
 
 clear_build_caches() {
   echo "  Clearing build caches..."

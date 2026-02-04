@@ -40,9 +40,15 @@ def apply_ocaml_530_workaround():
     print(f"Architecture: {arch}")
 
     if ocaml_version.startswith("5.3.") and arch in ("aarch64", "ppc64le", "arm64"):
-        # Use larger heap for complex operations like init
-        print("Applying OCaml 5.3.0 GC workaround (s=16M)")
-        os.environ["OCAMLRUNPARAM"] = "s=16M"
+        # OCaml 5.3.0 has heap corruption issues on aarch64/ppc64le under QEMU.
+        # The "corrupted size vs. prev_size" error is glibc malloc corruption.
+        # Try aggressive GC settings to minimize GC activity:
+        # - s=128M: large minor heap (reduce minor GC frequency)
+        # - H=256M: large initial major heap
+        # - o=200: high GC overhead (delay major GC)
+        gc_params = "s=128M,H=256M,o=200"
+        print(f"Applying OCaml 5.3.0 GC workaround ({gc_params})")
+        os.environ["OCAMLRUNPARAM"] = gc_params
 
     print(f"OCAMLRUNPARAM: {os.environ.get('OCAMLRUNPARAM', '<default>')}")
 
@@ -75,8 +81,15 @@ def main():
         os.makedirs(test_root, exist_ok=True)
 
         init_cmd = ["opam", "init", "--bare", "--no-setup", "--bypass-checks"]
-        # Add --disable-sandboxing on Unix (not available on Windows)
-        if platform.system() != "Windows":
+        if platform.system() == "Windows":
+            # Windows: Tell opam where MSYS2 tools are (from m2- conda packages)
+            # The m2- packages install to Library\usr\bin, so root is Library\usr
+            conda_prefix = os.environ.get("CONDA_PREFIX", "")
+            msys2_root = os.path.join(conda_prefix, "Library", "usr")
+            print(f"  Using MSYS2 root: {msys2_root}")
+            init_cmd.extend(["--cygwin-location", msys2_root])
+        else:
+            # Unix: disable sandboxing (bwrap not available in test env)
             init_cmd.append("--disable-sandboxing")
 
         run_cmd(init_cmd, "opam init")

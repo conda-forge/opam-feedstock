@@ -9,6 +9,7 @@ if defined OPAMSWITCH set "_CONDA_OPAM_SAVED_OPAMSWITCH=%OPAMSWITCH%"
 if defined OPAMNOENVNOTICE set "_CONDA_OPAM_SAVED_OPAMNOENVNOTICE=%OPAMNOENVNOTICE%"
 
 REM Point opam at this conda environment
-set "OPAMROOT=%CONDA_PREFIX%\share\opam"
+REM On Windows, conda packages install to Library\share, not share
+set "OPAMROOT=%CONDA_PREFIX%\Library\share\opam"
 set "OPAMSWITCH=conda"
 set "OPAMNOENVNOTICE=true"

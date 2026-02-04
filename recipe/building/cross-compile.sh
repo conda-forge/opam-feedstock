@@ -184,7 +184,7 @@ patch_dune_for_cross
 echo "=== OCaml compiler config after swap ==="
 ocamlc -config | grep -E "^(c_compiler|native_c_compiler|ccomp_type|architecture):"
 
-patch_ocaml_makefile_config
+# NOTE: patch_ocaml_makefile_config() removed - ocaml 5.3.0 _8+ provides correct config
 clear_build_caches
 
 echo "Running make with explicit cross-compiler: CC=${CC}, AR=${AR}"
