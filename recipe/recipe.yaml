@@ -115,6 +115,7 @@ tests:
       python testing/test-opam-activation.py
     files:
       recipe:
+        - testing/test_utils.py
         - testing/test-opam-version.py
         - testing/test-opam-functional.py
         - testing/test-opam-activation.py

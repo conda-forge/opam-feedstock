@@ -2,52 +2,13 @@
 """Test: opam version check
 
 Validates opam binary runs and reports correct version.
-
-OCaml 5.3.0 aarch64 bug workaround:
-OCaml 5.3.0 has a heap corruption bug on aarch64 that causes segfaults.
-Setting OCAMLRUNPARAM="s=16M" (minor heap size) works around the issue.
-This is fixed in OCaml 5.4.0.
 """
 
 import os
-import platform
 import subprocess
 import sys
 
-
-def get_ocaml_version():
-    """Get OCaml version string."""
-    try:
-        result = subprocess.run(
-            ["ocaml", "-version"],
-            capture_output=True,
-            text=True,
-            check=False,
-        )
-        # Extract version like "5.3.0" from output
-        for word in result.stdout.split():
-            if word[0].isdigit():
-                return word
-    except FileNotFoundError:
-        pass
-    return "unknown"
-
-
-def apply_ocaml_530_workaround():
-    """Apply OCaml 5.3.0 aarch64/ppc64le GC workaround if needed."""
-    ocaml_version = get_ocaml_version()
-    arch = platform.machine().lower()
-
-    print(f"OCaml version: {ocaml_version}")
-    print(f"Architecture: {arch}")
-
-    if ocaml_version.startswith("5.3.") and arch in ("aarch64", "ppc64le", "arm64"):
-        # OCaml 5.3.0 has heap corruption issues on aarch64/ppc64le under QEMU.
-        gc_params = "s=128M,H=256M,o=200"
-        print(f"Applying OCaml 5.3.0 GC workaround ({gc_params})")
-        os.environ["OCAMLRUNPARAM"] = gc_params
-
-    print(f"OCAMLRUNPARAM: {os.environ.get('OCAMLRUNPARAM', '<default>')}")
+from test_utils import apply_ocaml_530_workaround
 
 
 def main():
