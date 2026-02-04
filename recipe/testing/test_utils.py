@@ -27,6 +27,27 @@ def get_ocaml_version():
     return "unknown"
 
 
+def get_target_arch():
+    """Get the target architecture, handling QEMU cross-compilation.
+
+    On CI runners, cross-compiled packages run under QEMU but platform.machine()
+    returns the HOST arch (x86_64), not the TARGET arch (aarch64/ppc64le).
+
+    Check conda's target_platform env var first, then fall back to platform.machine().
+    """
+    # Conda sets target_platform during builds and tests
+    target_platform = os.environ.get("target_platform", "")
+    if "aarch64" in target_platform:
+        return "aarch64"
+    if "ppc64le" in target_platform:
+        return "ppc64le"
+    if "arm64" in target_platform:
+        return "arm64"
+
+    # Fall back to platform detection
+    return platform.machine().lower()
+
+
 def apply_ocaml_530_workaround():
     """Apply OCaml 5.3.0 aarch64/ppc64le GC workaround if needed.
 
@@ -42,10 +63,11 @@ def apply_ocaml_530_workaround():
     This will be fixed in OCaml 5.4.0.
     """
     ocaml_version = get_ocaml_version()
-    arch = platform.machine().lower()
+    arch = get_target_arch()
 
     print(f"OCaml version: {ocaml_version}")
     print(f"Architecture: {arch}")
+    print(f"target_platform: {os.environ.get('target_platform', '<not set>')}")
 
     if ocaml_version.startswith("5.3.") and arch in ("aarch64", "ppc64le", "arm64"):
         gc_params = "s=128M,H=256M,o=200,d=1"
