@@ -251,23 +251,7 @@ configure_cross_environment() {
   fi
 }
 
-create_macos_ocamlmklib_wrapper() {
-  # NOTE: Still needed - ocaml 5.3.0 _9 fix not sufficient for cross-compile
-  echo "  Creating macOS ocamlmklib wrapper..."
-  local real_ocamlmklib="${BUILD_PREFIX}/bin/ocamlmklib"
-
-  if [[ -f "${real_ocamlmklib}" ]] && [[ ! -f "${real_ocamlmklib}.real" ]]; then
-    mv "${real_ocamlmklib}" "${real_ocamlmklib}.real"
-    cat > "${real_ocamlmklib}" << 'WRAPPER_EOF'
-#!/bin/bash
-# Wrapper to add -undefined dynamic_lookup for macOS shared lib creation
-# This allows _caml_* symbols to remain unresolved until runtime
-exec "${0}.real" -ldopt "-Wl,-undefined,dynamic_lookup" "$@"
-WRAPPER_EOF
-    chmod +x "${real_ocamlmklib}"
-    echo "    Created wrapper: ${real_ocamlmklib}"
-  fi
-}
+# REMOVED: create_macos_ocamlmklib_wrapper() - ocaml 5.3.0 _10 has correct linker flags
 
 patch_dune_for_cross() {
   echo "  Patching Dune files for cross-compilation..."

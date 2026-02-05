@@ -17,14 +17,7 @@ source "${RECIPE_DIR}/building/build_functions.sh"
 
 echo "=== PHASE 0: Environment Setup ==="
 
-# macOS: OCaml compiler has @rpath/libzstd.1.dylib embedded but rpath doesn't
-# resolve in build environment. Set DYLD_FALLBACK_LIBRARY_PATH so executables
-# built by OCaml can find libzstd at runtime.
-# NOTE: Still needed as of ocaml 5.3.0 _8+ (tested 2026-02-04)
-if is_macos; then
-  export DYLD_FALLBACK_LIBRARY_PATH="${BUILD_PREFIX}/lib:${PREFIX}/lib:${DYLD_FALLBACK_LIBRARY_PATH:-}"
-  echo "Set DYLD_FALLBACK_LIBRARY_PATH for macOS: ${DYLD_FALLBACK_LIBRARY_PATH}"
-fi
+# REMOVED: DYLD_FALLBACK_LIBRARY_PATH workaround - ocaml 5.3.0 _10 has correct rpath for libzstd
 
 if is_linux || is_macos; then
   export OPAM_INSTALL_PREFIX="${PREFIX}"

@@ -43,10 +43,7 @@ requirements:
     - binutils
     - curl
     - git
-    # NOTE: Requires ocaml 5.3.0 build 8+ for correct cross-compiler Makefile.config
-    # and CONDA_OCAML_* environment variables from activation script.
-    # ocamlmklib wrapper still needed for macOS cross-compile (ocaml _9 fix not sufficient)
-    - ocaml >=5.3.0
+    - ocaml >=5.3.0 *_10
     - if: unix
       then:
         # OCaml compiler has zstd paths embedded from its build environment.
