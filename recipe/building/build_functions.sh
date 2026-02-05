@@ -252,6 +252,7 @@ configure_cross_environment() {
 }
 
 create_macos_ocamlmklib_wrapper() {
+  # NOTE: Still needed - ocaml 5.3.0 _9 fix not sufficient for cross-compile
   echo "  Creating macOS ocamlmklib wrapper..."
   local real_ocamlmklib="${BUILD_PREFIX}/bin/ocamlmklib"
 

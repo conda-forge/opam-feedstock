@@ -135,11 +135,12 @@ def get_msys2_root():
 def get_ocaml_build_version():
     """Get the OCaml version that opam was built with.
 
-    Reads from .ocaml-build-version file in OPAMROOT, written during build.
+    Reads from testing/ocaml-build-version (same directory as this script),
+    written during build to RECIPE_DIR/testing/.
     Returns version string like "5.3.0" or "unknown" if not found.
     """
-    opam_root = get_opam_root()
-    version_file = os.path.join(opam_root, ".ocaml-build-version")
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    version_file = os.path.join(script_dir, "ocaml-build-version")
     try:
         with open(version_file) as f:
             return f.read().strip()

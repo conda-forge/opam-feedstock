@@ -21,14 +21,10 @@ from test_utils import (
 def main():
     print("=== opam functional tests ===")
 
-    # Check if we should skip due to OCaml 5.3.0 GC bug on aarch64/ppc64le
-    skip, reason = should_skip_heavy_tests()
-    if skip:
-        print(f"\n[SKIP] {reason}")
-        print("=== Functional tests skipped (known OCaml bug) ===")
-        return 0
-
     apply_ocaml_530_workaround()
+
+    # Check if failures should be tolerated due to OCaml 5.3.0 GC bug
+    tolerate_failure, reason = should_skip_heavy_tests()
 
     # Use isolated test root
     test_root = os.path.abspath("./opam_functional_test")
@@ -72,6 +68,9 @@ def main():
 
     except RuntimeError as e:
         print(f"\n=== Functional tests FAILED: {e} ===")
+        if tolerate_failure:
+            print(f"[KNOWN ISSUE] {reason}")
+            return 0
         return 1
 
     finally:

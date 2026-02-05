@@ -174,6 +174,7 @@ swap_ocaml_compilers
 setup_cross_c_compilers
 configure_cross_environment
 
+# NOTE: Still needed - ocaml 5.3.0 _9 fix not sufficient for cross-compile
 if is_macos; then
   create_macos_ocamlmklib_wrapper
 fi

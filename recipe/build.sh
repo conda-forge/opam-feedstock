@@ -20,6 +20,7 @@ echo "=== PHASE 0: Environment Setup ==="
 # macOS: OCaml compiler has @rpath/libzstd.1.dylib embedded but rpath doesn't
 # resolve in build environment. Set DYLD_FALLBACK_LIBRARY_PATH so executables
 # built by OCaml can find libzstd at runtime.
+# NOTE: Still needed as of ocaml 5.3.0 _8+ (tested 2026-02-04)
 if is_macos; then
   export DYLD_FALLBACK_LIBRARY_PATH="${BUILD_PREFIX}/lib:${PREFIX}/lib:${DYLD_FALLBACK_LIBRARY_PATH:-}"
   echo "Set DYLD_FALLBACK_LIBRARY_PATH for macOS: ${DYLD_FALLBACK_LIBRARY_PATH}"
@@ -106,9 +107,9 @@ fi
 # Remove binary caches — they contain non-relocatable paths and opam regenerates them.
 find "${OPAMROOT}" -name "*.cache" -type f -delete
 
-# Record build-time OCaml version for tests to detect OCaml 5.3.0 GC bug workaround
+# Record build-time OCaml version for test skip logic (OCaml 5.3.0 GC bug on aarch64/ppc64le)
 OCAML_BUILD_VERSION=$(ocaml -version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' || echo "unknown")
-echo "${OCAML_BUILD_VERSION}" > "${OPAMROOT}/.ocaml-build-version"
+echo "${OCAML_BUILD_VERSION}" > "${RECIPE_DIR}/testing/ocaml-build-version"
 echo "Recorded OCaml build version: ${OCAML_BUILD_VERSION}"
 
 echo "=== Build Complete ==="

@@ -44,7 +44,8 @@ requirements:
     - curl
     - git
     # NOTE: Requires ocaml 5.3.0 build 8+ for correct cross-compiler Makefile.config
-    # and CONDA_OCAML_* environment variables from activation script
+    # and CONDA_OCAML_* environment variables from activation script.
+    # ocamlmklib wrapper still needed for macOS cross-compile (ocaml _9 fix not sufficient)
     - ocaml >=5.3.0
     - if: unix
       then:
@@ -115,6 +116,7 @@ tests:
       python testing/test-opam-activation.py
     files:
       recipe:
+        - testing/ocaml-build-version
         - testing/test_utils.py
         - testing/test-opam-version.py
         - testing/test-opam-functional.py
