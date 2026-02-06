@@ -17,7 +17,14 @@ source "${RECIPE_DIR}/building/build_functions.sh"
 
 echo "=== PHASE 0: Environment Setup ==="
 
-# REMOVED: DYLD_FALLBACK_LIBRARY_PATH workaround - ocaml 5.3.0 _10 has correct rpath for libzstd
+# macOS: OCaml's -output-complete-exe embeds @rpath/libzstd.1.dylib but the rpath
+# doesn't include BUILD_PREFIX/lib. Binaries created DURING build (like .duneboot.exe)
+# need this fallback since conda's rpath fixup only runs AFTER build completes.
+# NOTE: Still needed as of ocaml 5.3.0 _10 (tested 2026-02-05)
+if is_macos; then
+  export DYLD_FALLBACK_LIBRARY_PATH="${BUILD_PREFIX}/lib:${PREFIX}/lib:${DYLD_FALLBACK_LIBRARY_PATH:-}"
+  echo "Set DYLD_FALLBACK_LIBRARY_PATH for macOS: ${DYLD_FALLBACK_LIBRARY_PATH}"
+fi
 
 if is_linux || is_macos; then
   export OPAM_INSTALL_PREFIX="${PREFIX}"
