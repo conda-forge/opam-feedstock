@@ -13,12 +13,9 @@
 readonly OPAM_COMMANDS=(init install remove upgrade switch pin source list show search info config env var exec repository update option lock clean reinstall admin)
 readonly OPAM_ADMIN_COMMANDS=(cache check filter list)
 
-# Limits for verification output
-readonly PARSER_SAMPLE_LIMIT=20
-readonly OCAML_RUNTIME_SAMPLE=5
+# Windows workaround constant
 readonly OPAM_STUB_HEADER_LINES=73
 
-readonly SAVED_PARSERS_DIR="${SRC_DIR}/_saved_parsers"
 
 # ==============================================================================
 # PLATFORM DETECTION
@@ -80,29 +77,24 @@ generate_native_man_pages() {
   local native_man_dir="${1}"
   local dune="${2}"
 
-  echo "=== PHASE 1.5: Pre-generate Man Pages with Native opam ==="
+  echo "=== Pre-generating Man Pages with Native opam ==="
   mkdir -p "${native_man_dir}"
 
-  # Save pre-generated parsers (for later cross-compile)
-  save_parser_files
-
-  # Remove parsers so native build regenerates them
-  remove_parser_files
-
-  # Build native opam
+  # Build native opam using external dune (menhir/cppo from conda packages in PATH)
   echo "Building native opam for man page generation..."
-  cd "${SRC_DIR}"
+  local opam_dir="${SRC_DIR}/opam"
+  [[ -d "${opam_dir}" ]] || opam_dir="${SRC_DIR}"
+  cd "${opam_dir}"
+
   if ! "${dune}" build --profile=release --root . --promote-install-files -- opam.install opam-installer.install 2>&1; then
     warn "Native build failed, skipping man page generation"
     touch "${native_man_dir}/.failed"
-    restore_parser_files
     return 1
   fi
 
-  local native_opam="${SRC_DIR}/_build/default/src/client/opamMain.exe"
-  local native_installer="${SRC_DIR}/_build/default/src/tools/opam_installer.exe"
+  local native_opam="${opam_dir}/_build/default/src/client/opamMain.exe"
+  local native_installer="${opam_dir}/_build/default/src/tools/opam_installer.exe"
 
-  # Generate man pages using the OPAM_COMMANDS and OPAM_ADMIN_COMMANDS constants
   if [[ -x "${native_opam}" ]]; then
     echo "Native opam built: $(file ${native_opam})"
     echo "Generating man pages..."
@@ -120,15 +112,40 @@ generate_native_man_pages() {
     touch "${native_man_dir}/.failed"
   fi
 
-  # Generate installer man page
   if [[ -x "${native_installer}" ]]; then
     "${native_installer}" --help=groff > "${native_man_dir}/opam-installer.1" 2>/dev/null || true
   fi
 
-  # Clean build artifacts and restore parsers for cross-compile
-  echo "Cleaning native _build to prepare for cross-compilation..."
-  rm -rf "${SRC_DIR}/_build"
-  restore_parser_files
+  # Preserve menhir-generated parser files before cleaning _build
+  # Only copy files generated from .mly (architecture-independent)
+  echo "Preserving menhir-generated parser files..."
+  local build_dir="${opam_dir}/_build/default"
+
+  # opam-file-format parser (opamBaseParser.mly -> opamBaseParser.ml)
+  if [[ -f "${build_dir}/src_ext/opam-file-format/src/opamBaseParser.ml" ]]; then
+    cp -v "${build_dir}/src_ext/opam-file-format/src/opamBaseParser.ml" \
+          "${opam_dir}/src_ext/opam-file-format/src/"
+    cp -v "${build_dir}/src_ext/opam-file-format/src/opamBaseParser.mli" \
+          "${opam_dir}/src_ext/opam-file-format/src/" 2>/dev/null || true
+  fi
+
+  # dose3 parsers - only copy files that have corresponding .mly sources
+  for mly_file in "${opam_dir}"/src_ext/dose3/src/*/*.mly; do
+    if [[ -f "$mly_file" ]]; then
+      local dir=$(dirname "$mly_file")
+      local base=$(basename "$mly_file" .mly)
+      local rel_dir=${dir#${opam_dir}/}
+      local build_subdir="${build_dir}/${rel_dir}"
+      if [[ -f "${build_subdir}/${base}.ml" ]]; then
+        cp -v "${build_subdir}/${base}.ml" "${dir}/"
+        cp -v "${build_subdir}/${base}.mli" "${dir}/" 2>/dev/null || true
+      fi
+    fi
+  done
+
+  # Clean native build artifacts before cross-compilation
+  echo "Cleaning native _build..."
+  rm -rf "${opam_dir}/_build"
 
   echo "Pre-generated man pages:"
   ls -la "${native_man_dir}/"*.1 2>/dev/null | head -10 || echo "  (none generated)"
@@ -243,9 +260,32 @@ configure_cross_environment() {
     echo "    Set OCAMLLIB for ocamlmklib: ${OCAMLLIB}"
     echo "    Set LIBRARY_PATH: ${cross_ocaml_lib}"
     echo "    Set LDFLAGS: ${LDFLAGS}"
+
+    # OCAMLPATH strategy for cross-compilation:
+    # - Cross path FIRST: so compiler finds cross-compiled libraries for linking
+    # - Native path SECOND: so dune's runtime can load native stub libraries (dllunixbyt.so)
+    # This ordering ensures compilation uses cross libs while dune can still run
+    local native_ocaml_lib="${BUILD_PREFIX}/lib/ocaml"
+    export OCAMLPATH="${cross_ocaml_lib}:${native_ocaml_lib}"
+    echo "    Set OCAMLPATH (cross-first, native-fallback): ${OCAMLPATH}"
+
+    # CAML_LD_LIBRARY_PATH: OCaml's stub library search path (takes precedence over OCAMLPATH)
+    # OCaml bytecode runtime (used by dune) dynamically loads .so stub files.
+    # Dune is native x86_64, so it needs native .so files, not cross-compiled aarch64 ones.
+    # CAML_LD_LIBRARY_PATH is checked BEFORE OCAMLPATH-derived stublibs directories.
+    local native_stublibs="${native_ocaml_lib}/stublibs"
+    export CAML_LD_LIBRARY_PATH="${native_stublibs}"
+    echo "    Set CAML_LD_LIBRARY_PATH (native stublibs): ${CAML_LD_LIBRARY_PATH}"
+
+    # Also set LD_LIBRARY_PATH as fallback (for dlopen() after OCaml finds the library)
+    export LD_LIBRARY_PATH="${native_stublibs}:${LD_LIBRARY_PATH:-}"
+    echo "    Set LD_LIBRARY_PATH (native stublibs): ${native_stublibs}"
+
     # Debug: show what's in the cross-compiler lib
     echo "    Cross-compiled OCaml runtime files:"
     ls -la "${cross_ocaml_lib}/"*.a 2>/dev/null | head -5 || echo "      (no .a files found)"
+    echo "    Cross-compiled OCaml packages:"
+    ls -d "${cross_ocaml_lib}"/*/ 2>/dev/null | head -10 || echo "      (no subdirectories found)"
   fi
 }
 
@@ -304,25 +344,38 @@ patch_ocaml_makefile_config() {
   fi
 }
 
-clear_build_caches() {
-  echo "  Clearing build caches..."
+patch_opam_makefile_config() {
+  # Fix OCAMLLIB in opam's Makefile.config to point to cross-compiled libraries
+  # configure captured native OCAMLLIB; we need cross path
+  local makefile_config="${SRC_DIR}/opam/Makefile.config"
+  [[ -f "${makefile_config}" ]] || makefile_config="${SRC_DIR}/Makefile.config"
 
-  # Clear Dune caches to force cross-compiler detection
+  if [[ -f "${makefile_config}" ]]; then
+    local cross_ocamllib=$(ocamlc -where)
+    echo "  Patching opam Makefile.config OCAMLLIB to: ${cross_ocamllib}"
+    sed -i "s|^OCAMLLIB = .*|OCAMLLIB = ${cross_ocamllib}|" "${makefile_config}"
+    grep "^OCAMLLIB" "${makefile_config}"
+  fi
+}
+
+clear_build_caches() {
+  echo "  Clearing build caches for cross-compilation..."
+
+  # Clear any _build directories from native man page generation
   rm -rf "${SRC_DIR}/_build" 2>/dev/null || true
+  rm -rf "${SRC_DIR}/opam/_build" 2>/dev/null || true
+
+  # Clear vendored library build caches
   for ext_dir in "${SRC_DIR}"/src_ext/*/; do
-    ext_name=$(basename "$ext_dir")
-    if [[ "${ext_name}" != "dune-local" && "${ext_name}" != "cppo" && "${ext_name}" != "menhir" ]]; then
-      rm -rf "${ext_dir}/_build" 2>/dev/null || true
-    fi
+    rm -rf "${ext_dir}/_build" 2>/dev/null || true
+  done
+  for ext_dir in "${SRC_DIR}"/opam/src_ext/*/; do
+    rm -rf "${ext_dir}/_build" 2>/dev/null || true
   done
 
-  # Remove Phase 1 C stubs (will rebuild as cross-compiled)
-  echo "    Removing Phase 1 C stubs (will rebuild as cross-compiled)..."
-  find "${SRC_DIR}/src_ext" -name "*.a" -not -path "*/dune-local/*" -not -path "*/cppo/*" -not -path "*/menhir/*" -type f -delete 2>/dev/null || true
-  find "${SRC_DIR}/src" -name "*.a" -type f -delete 2>/dev/null || true
+  # Remove any object files from previous builds
   find "${SRC_DIR}" -name "*.o" -delete 2>/dev/null || true
-  find "${SRC_DIR}" -name "*.a" -type f -delete 2>/dev/null || true
-  echo "    Object files cleared - forcing fresh cross-compile rebuild"
+  echo "  Build caches cleared"
 }
 
 # ==============================================================================
@@ -401,45 +454,24 @@ apply_windows_workarounds() {
 }
 
 # ==============================================================================
-# Parser File Management
+# Parser File Generation
 # ==============================================================================
-# These functions manage pre-generated parser files for cross-compilation.
-# Parser generators (menhir) produce .ml/.mli files that must be pre-generated
-# with native tools since cross-compiled generators can't run on build machine.
 
-# Copy menhir's own stage2 parser files from build dir to source dir
-copy_menhir_stage2_to_source() {
-  local menhir_build="${SRC_DIR}/src_ext/menhir/_build/default/src/stage2"
-  local menhir_src="${SRC_DIR}/src_ext/menhir/src/stage2"
-
-  echo "Copying menhir stage2 parser files to source directory..."
-  if [[ -f "${menhir_build}/parser.ml" ]]; then
-    cp -v "${menhir_build}/parser.ml" "${menhir_src}/"
-    cp -v "${menhir_build}/parser.mli" "${menhir_src}/" 2>/dev/null || true
-  fi
-  if [[ -f "${menhir_build}/parserMessages.ml" ]]; then
-    cp -v "${menhir_build}/parserMessages.ml" "${menhir_src}/"
-  fi
-  for f in parserMessages.auto.messages parserMessages.check; do
-    if [[ -f "${menhir_build}/${f}" ]]; then
-      cp -v "${menhir_build}/${f}" "${menhir_src}/"
-    fi
-  done
-}
-
-# Generate parser files for opam-file-format and dose3 using native menhir
+# Generate parser files for opam-file-format and dose3 using menhir from conda
 generate_parser_files() {
-  local native_menhir="${1}"
+  local menhir="${1}"
 
-  echo "Pre-generating parser files with native menhir..."
-  cd "${SRC_DIR}"
+  echo "Pre-generating parser files with menhir..."
+  local opam_dir="${SRC_DIR}/opam"
+  [[ -d "${opam_dir}" ]] || opam_dir="${SRC_DIR}"
+  cd "${opam_dir}"
 
   # opam-file-format: generates opamBaseParser.ml from opamBaseParser.mly
   if [[ -f "src_ext/opam-file-format/src/opamBaseParser.mly" ]]; then
     echo "  Generating opam-file-format parser..."
-    "${native_menhir}" --ocamlc ocamlc \
+    "${menhir}" --ocamlc ocamlc \
       --base "src_ext/opam-file-format/src/opamBaseParser" \
-      "src_ext/opam-file-format/src/opamBaseParser.mly" 2>&1 || echo "    Warning: opam-file-format parser generation failed"
+      "src_ext/opam-file-format/src/opamBaseParser.mly" 2>&1 || echo "    Warning: failed"
   fi
 
   # dose3: generates several parsers
@@ -448,94 +480,7 @@ generate_parser_files() {
       local dir=$(dirname "$mly")
       local base=$(basename "$mly" .mly)
       echo "  Generating parser: $mly"
-      "${native_menhir}" --ocamlc ocamlc --base "${dir}/${base}" "$mly" 2>&1 || echo "    Warning: failed"
+      "${menhir}" --ocamlc ocamlc --base "${dir}/${base}" "$mly" 2>&1 || echo "    Warning: failed"
     fi
   done
-}
-
-# Save pre-generated parser files for later restoration
-save_parser_files() {
-  echo "Saving pre-generated parser files for later restoration..."
-  mkdir -p "${SAVED_PARSERS_DIR}"
-
-  # opam-file-format
-  cp -p "${SRC_DIR}/src_ext/opam-file-format/src/opamBaseParser.ml" "${SAVED_PARSERS_DIR}/" 2>/dev/null || true
-  cp -p "${SRC_DIR}/src_ext/opam-file-format/src/opamBaseParser.mli" "${SAVED_PARSERS_DIR}/" 2>/dev/null || true
-
-  # dose3 parsers
-  for mly in "${SRC_DIR}"/src_ext/dose3/src/versioning/version*.mly "${SRC_DIR}"/src_ext/dose3/src/*/parser*.mly; do
-    if [[ -f "$mly" ]]; then
-      local dir=$(dirname "$mly")
-      local base=$(basename "$mly" .mly)
-      local reldir=${dir#${SRC_DIR}/}
-      mkdir -p "${SAVED_PARSERS_DIR}/${reldir}"
-      cp -p "${dir}/${base}.ml" "${SAVED_PARSERS_DIR}/${reldir}/" 2>/dev/null || true
-      cp -p "${dir}/${base}.mli" "${SAVED_PARSERS_DIR}/${reldir}/" 2>/dev/null || true
-    fi
-  done
-
-  # menhir stage2 parser files
-  local menhir_stage2="${SRC_DIR}/src_ext/menhir/src/stage2"
-  mkdir -p "${SAVED_PARSERS_DIR}/menhir_stage2"
-  for f in parser.ml parser.mli parserMessages.ml parserMessages.auto.messages parserMessages.check; do
-    cp -p "${menhir_stage2}/${f}" "${SAVED_PARSERS_DIR}/menhir_stage2/" 2>/dev/null || true
-  done
-
-  echo "Saved parsers:"
-  find "${SAVED_PARSERS_DIR}" \( -name "*.ml" -o -name "*.mli" \) 2>/dev/null | head -20 || echo "  (none)"
-}
-
-# Remove parser files (native build can regenerate them)
-remove_parser_files() {
-  echo "Removing pre-generated parser files for native build..."
-
-  # opam-file-format
-  rm -f "${SRC_DIR}/src_ext/opam-file-format/src/opamBaseParser.ml" 2>/dev/null || true
-  rm -f "${SRC_DIR}/src_ext/opam-file-format/src/opamBaseParser.mli" 2>/dev/null || true
-
-  # dose3 parsers
-  for base in version822 versioncudf parser822 parsercudf; do
-    find "${SRC_DIR}/src_ext/dose3" -name "${base}.ml" -delete 2>/dev/null || true
-    find "${SRC_DIR}/src_ext/dose3" -name "${base}.mli" -delete 2>/dev/null || true
-  done
-
-  # menhir stage2 parser files
-  local menhir_stage2="${SRC_DIR}/src_ext/menhir/src/stage2"
-  rm -f "${menhir_stage2}/parser.ml" 2>/dev/null || true
-  rm -f "${menhir_stage2}/parser.mli" 2>/dev/null || true
-  rm -f "${menhir_stage2}/parserMessages.ml" 2>/dev/null || true
-  rm -f "${menhir_stage2}/parserMessages.auto.messages" 2>/dev/null || true
-  rm -f "${menhir_stage2}/parserMessages.check" 2>/dev/null || true
-}
-
-# Restore parser files for cross-compilation
-restore_parser_files() {
-  echo "Restoring pre-generated parser files for cross-compilation..."
-
-  if [[ ! -d "${SAVED_PARSERS_DIR}" ]]; then
-    echo "  WARNING: No saved parsers found at ${SAVED_PARSERS_DIR}"
-    return 1
-  fi
-
-  # opam-file-format
-  cp -p "${SAVED_PARSERS_DIR}/opamBaseParser.ml" "${SRC_DIR}/src_ext/opam-file-format/src/" 2>/dev/null || true
-  cp -p "${SAVED_PARSERS_DIR}/opamBaseParser.mli" "${SRC_DIR}/src_ext/opam-file-format/src/" 2>/dev/null || true
-
-  # dose3 parsers
-  for subdir in "${SAVED_PARSERS_DIR}"/src_ext/dose3/src/*/; do
-    if [[ -d "${subdir}" ]]; then
-      local dest_dir="${SRC_DIR}/${subdir#${SAVED_PARSERS_DIR}/}"
-      cp -p "${subdir}"*.ml "${dest_dir}" 2>/dev/null || true
-      cp -p "${subdir}"*.mli "${dest_dir}" 2>/dev/null || true
-    fi
-  done
-
-  # menhir stage2 parser files
-  if [[ -d "${SAVED_PARSERS_DIR}/menhir_stage2" ]]; then
-    local menhir_stage2="${SRC_DIR}/src_ext/menhir/src/stage2"
-    cp -p "${SAVED_PARSERS_DIR}/menhir_stage2/"* "${menhir_stage2}/" 2>/dev/null || true
-    echo "  Restored menhir stage2 files"
-  fi
-
-  echo "Restored parsers"
 }

@@ -45,10 +45,42 @@ if is_cross_compile; then
   # 1. Build dune with native compiler (it runs on build machine)
   # 2. Swap to cross-compiler for the main opam build
 
+  cd "${SRC_DIR}/opam"
   source "${RECIPE_DIR}"/building/cross-compile.sh
 else
   cd "${SRC_DIR}/opam"
-  ./configure --prefix="${OPAM_INSTALL_PREFIX}" --with-vendored-deps > /dev/null 2>&1 || { cat config.log; exit 1; }
+
+  # ==============================================================================
+  # Native Build: Use external tools from our packages
+  # ==============================================================================
+  # Pre-built dune, cppo, menhir are in PATH (from subpackage dependencies).
+  # Configure opam to use external dune, and let dune discover cppo/menhir
+  # from PATH automatically (Dune's tool discovery checks PATH).
+  # ==============================================================================
+
+  echo "=== Checking for external build tools ==="
+  EXTERNAL_DUNE=""
+  if command -v dune &>/dev/null; then
+    EXTERNAL_DUNE="$(command -v dune)"
+    echo "  dune: ${EXTERNAL_DUNE}"
+  fi
+  if command -v cppo &>/dev/null; then
+    echo "  cppo: $(command -v cppo)"
+  fi
+  if command -v menhir &>/dev/null; then
+    echo "  menhir: $(command -v menhir)"
+  fi
+
+  # Configure with external dune (if available) + vendored OCaml libraries
+  if [[ -n "${EXTERNAL_DUNE}" ]]; then
+    echo "Using external dune: ${EXTERNAL_DUNE}"
+    ./configure --prefix="${OPAM_INSTALL_PREFIX}" \
+      --with-vendored-deps \
+      --with-dune="${EXTERNAL_DUNE}" > /dev/null 2>&1 || { cat config.log; exit 1; }
+  else
+    echo "WARNING: dune not in PATH, using vendored (slower)"
+    ./configure --prefix="${OPAM_INSTALL_PREFIX}" --with-vendored-deps > /dev/null 2>&1 || { cat config.log; exit 1; }
+  fi
 
   # ==============================================================================
   # Windows: Dune workarounds
@@ -56,11 +88,11 @@ else
 
   if is_non_unix; then
     apply_windows_workarounds
-    # Patch vendored dune if it exists (may not exist if using system dune)
-    if [[ -d "src_ext/dune-local" ]]; then
+    # Vendored dune patch only needed if not using external dune
+    if [[ -z "${EXTERNAL_DUNE}" ]] && [[ -d "src_ext/dune-local" ]]; then
       patch -p1 -d src_ext/dune-local < "${RECIPE_DIR}/patches/xxxx-fix-dune-which-double-exe-on-windows.patch"
     else
-      echo "Note: src_ext/dune-local not found, skipping dune patch (using system dune)"
+      echo "Note: Using external dune, skipping vendored dune patch"
     fi
   fi
 
