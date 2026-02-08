@@ -59,13 +59,14 @@ if is_macos; then
 DUNE_EOF
   echo "  Created: src_ext/base64/config/which-unsafe-file"
 
-  # mccs context_flags
+  # mccs context_flags - pre-generate all sexp files that context_flags.exe would produce
   for dir in "src_ext/mccs/src" "src_ext/mccs/src/glpk"; do
     if [[ -d "$dir" ]]; then
       echo "(-Wall -Wextra -Wno-unused-parameter -x c++ -std=gnu++11 -DUSEGLPK)" > "$dir/cxxflags.sexp"
+      echo "(-Wall -Wextra -Wno-unused-parameter -DUSEGLPK)" > "$dir/cflags.sexp"
       echo "(-lstdc++)" > "$dir/clibs.sexp"
       echo "()" > "$dir/flags.sexp"
-      echo "  Created: $dir/{cxxflags,clibs,flags}.sexp"
+      echo "  Created: $dir/{cxxflags,cflags,clibs,flags}.sexp"
     fi
   done
 
@@ -75,8 +76,10 @@ fi
 # ==========================================================================
 # Remove menhir stanzas from dune files
 # ==========================================================================
-# Parsers are pre-generated, so we disable menhir rules to prevent dune
-# from trying to invoke menhir during the cross-compile build.
+# Opam uses --with-vendored-deps, so menhir SOURCE is in src_ext/menhir.
+# During cross-compile, vendored menhir would be compiled for arm64 and dune
+# would try to run it → QEMU crash. Pre-generate parsers in Phase 1, then
+# remove menhir stanzas so vendored menhir doesn't get built/run.
 # ==========================================================================
 echo "Removing menhir stanzas from dune files..."
 for dune_file in $(find "src_ext" "src" -name 'dune' -type f 2>/dev/null); do
@@ -102,13 +105,9 @@ swap_ocaml_compilers
 setup_cross_c_compilers
 configure_cross_environment
 
-if is_macos; then
-  create_macos_ocamlmklib_wrapper
-fi
-
 patch_dune_for_cross
-patch_ocaml_makefile_config
-patch_opam_makefile_config
+# patch_ocaml_makefile_config - not needed, cross-compiler uses conda-ocaml-cc wrapper
+patch_opam_makefile_config  # Still needed: opam's Makefile.config has native OCAMLLIB from configure
 clear_build_caches
 
 # DEBUG: Check compiler config after swap

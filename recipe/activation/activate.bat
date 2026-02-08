@@ -8,7 +8,7 @@ if defined OPAMROOT set "_CONDA_OPAM_SAVED_OPAMROOT=%OPAMROOT%"
 if defined OPAMSWITCH set "_CONDA_OPAM_SAVED_OPAMSWITCH=%OPAMSWITCH%"
 if defined OPAMNOENVNOTICE set "_CONDA_OPAM_SAVED_OPAMNOENVNOTICE=%OPAMNOENVNOTICE%"
 
-REM Point opam at this conda environment
-set "OPAMROOT=%CONDA_PREFIX%\share\opam"
+REM Point opam at this conda environment (Library prefix on Windows)
+set "OPAMROOT=%CONDA_PREFIX%\Library\share\opam"
 set "OPAMSWITCH=conda"
 set "OPAMNOENVNOTICE=true"

@@ -1,11 +1,8 @@
 context:
-  build_number: 2
+  build_number: 1
   name: opam
   version: 2.5.0
-  cppo_version: "1.6.9"
-  dune_version: "3.21.0"
-  findlib_version: "1.9.8"
-  menhir_version: "20250912"
+
   library: ${{ "Library/" if not unix }}
   m2: ${{ "m2-" if not unix }}
   sh: ${{ "sh" if unix else "bat" }}
@@ -18,23 +15,6 @@ source:
   - url: https://github.com/ocaml/${{ name }}/releases/download/${{ version }}/${{ name }}-full-${{ version }}.tar.gz
     sha256: 25fb98f962c4227c1261e142afc68a416778e6e819600bd5ee3ec4a18ae1e238
     target_directory: opam
-  - url: https://github.com/ocaml/dune/archive/${{ dune_version }}.tar.gz
-    sha256: 07c7dbd778579e35f365320b559d6f781cd755c6485b164b802f109fe21ead68
-    target_directory: dune
-  - url: https://github.com/ocaml-community/cppo/archive/v${{ cppo_version }}.tar.gz
-    sha256: 16036d85c11d330a7c8b56f4e071d6bbe86d8937c89d3d79f6eef0e38bdda26a
-    target_directory: cppo
-  - url: https://gitlab.inria.fr/fpottier/menhir/-/archive/${{ menhir_version }}/menhir-${{ menhir_version }}.tar.gz
-    sha256: 26b1f44d6b4ed634631c50866e5535062591308a01a987f415411a9543965c9b
-    target_directory: menhir
-
-  # This is an independent package, faulty, taking time to be upgraded
-  - url: https://github.com/ocaml/ocamlbuild/archive/0.16.1.tar.gz
-    sha256: 2ba6857f2991b7f69368e8db818b163d31cf5a367f15f5953bf8f01a77b3d4fc
-    target_directory: ocamlbuild
-  - url: http://download.camlcity.org/download/findlib-${{ findlib_version }}.tar.gz
-    sha256: 662c910f774e9fee3a19c4e057f380581ab2fc4ee52da4761304ac9c31b8869d
-    target_directory: ocaml-findlib
 
 build:
   number: ${{ build_number }}
@@ -67,22 +47,13 @@ outputs:
         - ${{ m2 }}grep
         - ${{ m2 }}make
         - ${{ m2 }}sed
-        # Build tools - always needed (native binaries that run on build machine)
-        # For native builds: pin_subpackage gets the just-built version
-        # For cross-builds: conda resolves to build_platform (linux-64) packages
-        - if: build_platform == target_platform
-          then:
-            - ${{ pin_subpackage('cppo', exact=True) }}
-            - ${{ pin_subpackage('dune', exact=True) }}
-            - ${{ pin_subpackage('menhir', exact=True) }}
-          else:
-            - cppo
-            - dune
-            - menhir
+        - ocaml-cppo
+        - ocaml-dune
+        - ocaml-menhir
         - binutils
         - curl
         - git
-        - ocaml ==5.3.0
+        - ocaml >=5.3.0 *_12
         - if: build_platform != target_platform
           then:
             - python >=3.9
@@ -120,7 +91,7 @@ outputs:
           # Once we have ocaml 5.4.0_1
           # - ocaml-compiler
     tests:
-      # 1. Package contents validation (using brace expansion for conciseness)
+      # Package contents validation (using brace expansion for conciseness)
       - package_contents:
           strict: true
           bin:
@@ -139,440 +110,49 @@ outputs:
             - ${{ library }}share/opam/repo/{default/repo,lock,repos-config}
             - etc/conda/test-files/*
 
-      # 2. Python-based functional tests
-      # Tests handle platform detection, OCaml 5.3 workarounds internally
-      # Using || true for graceful degradation on cross-compile/QEMU failures
-      - script: |
-          python testing/test-opam-version.py || true
-          python testing/test-opam-functional.py || true
-          python testing/test-opam-activation.py || true
-          python testing/test-findlib-integration.py || true
-        files:
-          recipe:
-            - testing/test-opam-version.py
-            - testing/test-opam-functional.py
-            - testing/test-opam-activation.py
-            - testing/test-findlib-integration.py
-        requirements:
-          run:
-            - python >=3.9
-            - ocaml
-            - if: build_platform == target_platform
-              then:
-                - dune
-                - opam-ocaml-findlib
-
-  - package:
-      name: dune
-      version: ${{ dune_version }}
-    build:
-      # Build tools only for native builds - they run on the BUILD machine
-      skip:
-        - build_platform != target_platform
-      script:
-        - if: unix
-          then:
-            - ${RECIPE_DIR}/build_dune.${{ sh }}
-          else:
-            - call %RECIPE_DIR%\build_dune.${{ sh }}
-    requirements:
-      build:
-        - if: _c == "_mingw"
-          then:
-            - ${{ compiler("m2w64_c") }}
-            - ${{ compiler("m2w64_cxx") }}
-            - ${{ stdlib("m2w64_c") }}
-          else:
-            - ${{ compiler("c") }}
-            - ${{ compiler("cxx") }}
-            - ${{ stdlib("c") }}
-        - ${{ m2 }}bash >=5.2
-        - ${{ m2 }}gawk
-        - ${{ m2 }}grep
-        - ${{ m2 }}make
-        - ${{ m2 }}sed
-        - ocaml ==5.3.0
-        - if: unix
-          then:
-            - file
-          else:
-            - ${{ m2 }}coreutils
-            - ${{ m2 }}diffutils
-            - ${{ m2 }}which
-        # - if: build_platform != target_platform
-        #   then:
-        #     - ocaml-cross-compilers
-      run:
-        - if: aarch64 or ppc64le
-          then:
-            - zstd
-      ignore_run_exports:
-        by_name:
-          - ocaml
-          - ocaml-cross-compilers
-    tests:
-      # 1. Package contents validation
-      - package_contents:
-          strict: true
-          bin:
-            - dune
+      # Architecture verification - Unix only (uses otool/readelf)
+      - if: unix
+        then:
+          script: bash testing/test-opam-arch.sh
           files:
-             - ${{ library }}doc/dune/CHANGES.md
-             - ${{ library }}doc/dune/LICENSE.md
-             - ${{ library }}doc/dune/README.md
-             - ${{ library }}doc/dune/odoc-pages/index.mld
-             - ${{ library }}lib/dune/META
-             - ${{ library }}lib/dune/dune-package
-             - ${{ library }}lib/dune/opam
-             - ${{ library }}share/man/man1/*
-             - ${{ library }}share/man/man5/dune-config.5
-             - etc/conda/activate.d/dune-activate.${{ sh }}
-             - etc/conda/deactivate.d/dune-deactivate.${{ sh }}
-             - if: unix or _c == "_mingw"
-               then:
-                 - ${{ library }}share/emacs/site-lisp/dune/dune-{flymake,watch}.el
-                 - ${{ library }}share/emacs/site-lisp/dune/dune.el
-               else:
-                 - ${{ library }}share/emacs/site-lisp/dune-{flymake,watch}.el
-                 - ${{ library }}share/emacs/site-lisp/dune.el
+            recipe:
+              - testing/test-opam-arch.sh
+          requirements:
+            run:
+              - if: linux
+                then:
+                  - binutils
 
-             - etc/conda/test-files/*
-
-      # 2. Python-based functional tests
-      # Tests handle platform detection, OCaml 5.3 workarounds internally
-      # Using || true for graceful degradation on cross-compile/QEMU failures
-      - script: |
-          python testing/test-dune-version.py || true
-          python testing/test-dune-arch.py || true
-          python testing/test-dune-paths.py || true
-          python testing/test-dune-config.py || true
-          python testing/test-dune-build.py || true
-          python testing/test-dune-cmi.py || true
-        files:
-          recipe:
-            - testing/test-dune-version.py
-            - testing/test-dune-arch.py
-            - testing/test-dune-paths.py
-            - testing/test-dune-config.py
-            - testing/test-dune-build.py
-            - testing/test-dune-cmi.py
-        requirements:
-          run:
-            - python >=3.9
-            - ocaml
-            - binutils
-
-    about:
-      license: MIT
-      license_file: dune/LICENSE.md
-      summary: A composable build system for OCaml.
-      homepage: https://dune.build/
-      repository: https://github.com/ocaml/dune
-
-  - package:
-      name: cppo
-      version: ${{ cppo_version }}
-    build:
-      # Build tools only for native builds - they run on the BUILD machine
-      skip:
-        - build_platform != target_platform
-      script:
-        - if: unix
-          then:
-            - ${RECIPE_DIR}/build_cppo.${{ sh }}
-          else:
-            - call %RECIPE_DIR%\build_cppo.${{ sh }}
-    requirements:
-      build:
-        - if: _c == "_mingw"
-          then:
-            - ${{ compiler("m2w64_c") }}
-            - ${{ compiler("m2w64_cxx") }}
-            - ${{ stdlib("m2w64_c") }}
-          else:
-            - ${{ compiler("c") }}
-            - ${{ compiler("cxx") }}
-            - ${{ stdlib("c") }}
-        # Build tools - always needed (resolved for build_platform)
-        - ${{ pin_subpackage('dune', exact=True) }}
-        - if: build_platform == target_platform
-          then:
-            - ${{ pin_subpackage('opam-ocamlbuild', exact=True) }}
-        - ${{ m2 }}bash >=5.2
-        - ${{ m2 }}make
-        - ${{ m2 }}sed
-        - ${{ m2 }}grep
-        - ocaml ==5.3.0
-        - if: unix
-          then:
-            - file
-        - if: not unix
-          then:
-            - ${{ m2 }}coreutils
-            - ${{ m2 }}diffutils
-            - ${{ m2 }}which
-      ignore_run_exports:
-        by_name:
-          - ocaml
-    tests:
-      # 1. Package contents validation
-      - package_contents:
-          strict: true
-          bin:
-            - cppo
+      # Version check - native builds OR Linux cross-compile (QEMU/binfmt available)
+      # macOS cross-compile: can't run ARM64 binaries, skip this test
+      - if: build_platform == target_platform or linux
+        then:
+          script: |
+            python testing/test-opam-version.py
           files:
-            - etc/conda/test-files/cppo/*
-            - ${{ library }}doc/cppo/LICENSE.md
-            - ${{ library }}doc/cppo/README.md
-            - ${{ library }}doc/cppo_ocamlbuild/LICENSE.md
-            - ${{ library }}doc/cppo_ocamlbuild/README.md
-            - ${{ library }}lib/ocaml/cppo/*
-            - ${{ library }}lib/ocaml/cppo_ocamlbuild/*
+            recipe:
+              - testing/test-opam-version.py
+          requirements:
+            run:
+              - python >=3.9
+              - ocaml
 
-      # 2. Python-based functional tests
-      - script: |
-          python testing/test-cppo-arch.py || true
-          python testing/test-cppo-functional.py || true
-        files:
-          recipe:
-            - testing/test-cppo-arch.py
-            - testing/test-cppo-functional.py
-        requirements:
-          run:
-            - python >=3.9
-
-    about:
-      license: BSD-3-Clause
-      license_file: cppo/LICENSE.md
-      summary: C preprocessor for OCaml
-      homepage: https://github.com/ocaml-community/cppo
-      repository: https://github.com/ocaml-community/cppo
-
-  - package:
-      name: menhir
-      version: ${{ menhir_version }}
-    build:
-      # Build tools only for native builds - they run on the BUILD machine
-      skip:
-        - build_platform != target_platform
-      script:
-        - if: unix
-          then:
-            - ${RECIPE_DIR}/build_menhir.${{ sh }}
-          else:
-            - call %RECIPE_DIR%\build_menhir.${{ sh }}
-    requirements:
-      build:
-        - if: _c == "_mingw"
-          then:
-            - ${{ compiler("m2w64_c") }}
-            - ${{ compiler("m2w64_cxx") }}
-            - ${{ stdlib("m2w64_c") }}
-          else:
-            - ${{ compiler("c") }}
-            - ${{ compiler("cxx") }}
-            - ${{ stdlib("c") }}
-        - ${{ m2 }}bash >=5.2
-        - ${{ m2 }}gawk
-        - ${{ m2 }}grep
-        - ${{ m2 }}make
-        - ${{ m2 }}sed
-        # Build tools - always needed (resolved for build_platform)
-        - ${{ pin_subpackage('dune', exact=True) }}
-        - ocaml ==5.3.0
-        - if: unix
-          then:
-            - file
-        - if: not unix
-          then:
-            - ${{ m2 }}coreutils
-            - ${{ m2 }}diffutils
-            - ${{ m2 }}which
-      ignore_run_exports:
-        by_name:
-          - ocaml
-    tests:
-      # 1. Package contents validation
-      - package_contents:
-          strict: true
-          bin:
-            - menhir
+      # Functional tests - native builds OR Linux cross-compile
+      # These run opam commands; Linux uses QEMU, macOS cross can't run ARM64
+      - if: build_platform == target_platform or linux
+        then:
+          script: |
+            python testing/test-opam-functional.py
+            python testing/test-opam-activation.py
           files:
-            - ${{ library }}doc/*
-            - ${{ library }}lib/coq-menhirlib/*
-            - ${{ library }}lib/menhir/*
-            - ${{ library }}lib/menhirCST/*
-            - ${{ library }}lib/menhirLib/*
-            - ${{ library }}lib/menhirSdk/*
-            - ${{ library }}share/man/man1/menhir.1
-
-            - etc/conda/test-files/menhir/*
-
-      # 2. Python-based functional tests
-      - script: |
-          python testing/test-menhir-arch.py || true
-          python testing/test-menhir-functional.py || true
-        files:
-          recipe:
-            - testing/test-menhir-arch.py
-            - testing/test-menhir-functional.py
-        requirements:
-          run:
-            - python >=3.9
-            - ocaml
-
-    about:
-      license: GPL-2.0-only
-      license_file: menhir/LICENSE
-      summary: An LR(1) parser generator for OCaml
-      homepage: https://gitlab.inria.fr/fpottier/menhir
-      repository: https://gitlab.inria.fr/fpottier/menhir
-
-
-
-  # This is an independent package, faulty, taking time to be upgraded
-  - package:
-      name: opam-ocamlbuild
-      version: ${{ version }}
-    build:
-      number: 100
-      script:
-        - if: unix
-          then:
-            - ${RECIPE_DIR}/build_ocamlbuild.${{ sh }}
-          else:
-            - call %RECIPE_DIR%\build_ocamlbuild.${{ sh }}
-    requirements:
-      build:
-        - if: _c == "_mingw"
-          then:
-            - ${{ compiler("m2w64_c") }}
-            - ${{ compiler("m2w64_cxx") }}
-            - ${{ stdlib("m2w64_c") }}
-          else:
-            - ${{ compiler("c") }}
-            - ${{ compiler("cxx") }}
-            - ${{ stdlib("c") }}
-        - ${{ m2 }}bash >=5.2
-        - ${{ m2 }}make
-        - binutils
-        - ocaml >=5.3.0
-        - ${{ m2 }}sed
-        - if: osx
-          then:
-            - lld
-            - llvm-tools
-        - if: not unix
-          then:
-            - ${{ m2 }}coreutils
-            - ${{ m2 }}diffutils
-            - ${{ m2 }}which
-    tests:
-      - package_contents:
-          strict: true
-          bin:
-            - ocamlbuild
-            - ocamlbuild.native
-          files:
-            - ${{ library }}lib/ocaml/ocamlbuild/META
-            - ${{ library }}lib/ocaml/ocamlbuild/ocamlbuild.{cmx,o,cmo}
-            - ${{ library }}lib/ocaml/ocamlbuild/ocamlbuild_*.{cmi,cmx,o}
-            - ${{ library }}lib/ocaml/ocamlbuild/ocamlbuildlib.{a,cma,cmxa}
-            - ${{ library }}lib/ocaml/ocamlbuild/signatures.{cmi,cmti,mli}
-            - ${{ library }}share/man/man1/ocamlbuild.1
-
-  - package:
-      name: opam-ocaml-findlib
-      version: ${{ findlib_version }}
-    build:
-      number: 100
-      prefix_detection:
-        force_file_type:
-          text:
-            - ${{ library }}lib/ocaml/site-lib/findlib/Makefile.config
-            - ${{ library }}lib/ocaml/topfind
-            - ${{ library }}etc/findlib.conf
-        ignore:
-          # Only ignore bytecode files (binary format, relocation corrupts them)
-          - ${{ library }}lib/ocaml/site-lib/**/*.cma
-          - ${{ library }}lib/ocaml/site-lib/**/*.cmi
-          - ${{ library }}lib/ocaml/site-lib/**/*.cmx
-          - ${{ library }}lib/ocaml/site-lib/**/*.cmt
-          - ${{ library }}lib/ocaml/site-lib/**/*.cmti
-      script:
-        - if: unix
-          then:
-            - ${RECIPE_DIR}/build_ocaml-findlib.${{ sh }}
-          else:
-            - call %RECIPE_DIR%\build_ocaml-findlib.${{ sh }}
-    requirements:
-      build:
-        - if: unix
-          then:
-            - ${{ compiler("c") }}
-            - ${{ stdlib("c") }}
-          else:
-            - ${{ compiler("m2w64_c") }}
-            - ${{ stdlib("m2w64_c") }}
-        - ${{ m2 }}bash >=5.2
-        - ${{ m2 }}make
-        - ${{ m2 }}sed
-        - ${{ m2 }}grep
-        - binutils
-        - ocaml >=5.3.0
-        - if: osx
-          then:
-            - lld
-            - llvm-tools
-        - if: not unix
-          then:
-            - ${{ m2 }}coreutils
-            - ${{ m2 }}diffutils
-            - ${{ m2 }}which
-    tests:
-      # 1. Package contents validation (using globs for conciseness)
-      - package_contents:
-          strict: true
-          bin:
-            - ocamlfind
-          files:
-            - ${{ library }}etc/findlib.conf
-            - ${{ library }}lib/ocaml/site-lib/bytes/META
-            - ${{ library }}lib/ocaml/site-lib/findlib/{META,Makefile.*}
-            - ${{ library }}lib/ocaml/site-lib/findlib/findlib*
-            - ${{ library }}lib/ocaml/site-lib/findlib/fl*
-            - ${{ library }}lib/ocaml/site-lib/findlib/{ocaml_args,topfind}.{cmi,mli}
-            - ${{ library }}share/man/man1/ocamlfind.1
-            - ${{ library }}share/man/man5/{META,findlib.conf,site-lib}.5
-            - ${{ library }}lib/ocaml/topfind
-            - etc/conda/activate.d/opam-ocaml-findlib_activate.${{ sh }}
-            - etc/conda/deactivate.d/opam-ocaml-findlib_deactivate.${{ sh }}
-            - etc/conda/test-files/*
-
-      # 2. Python-based functional tests
-      - script: |
-          python testing/test-findlib.py || true
-        files:
-          recipe:
-            - testing/test-findlib.py
-        requirements:
-          run:
-            - python >=3.9
-            - ocaml
-            - if: osx
-              then:
-                - lld
-                - llvm-tools
-
-    about:
-      homepage: http://projects.camlcity.org/projects/findlib.html
-      license: MIT
-      license_family: MIT
-      license_file: ocaml-findlib/LICENSE
-      summary: OCaml package manager and build helper
-      documentation: http://projects.camlcity.org/projects/dl/findlib-${{ findlib_version }}/doc/guide-html/index.html
-      repository: https://github.com/ocaml/findlib
-
+            recipe:
+              - testing/test-opam-functional.py
+              - testing/test-opam-activation.py
+          requirements:
+            run:
+              - python >=3.9
+              - ocaml
+              - ocaml-dune
 
 about:
   homepage: https://github.com/ocaml/opam

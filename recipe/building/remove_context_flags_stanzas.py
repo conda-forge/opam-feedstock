@@ -50,8 +50,19 @@ def remove_context_flags_stanzas(dune_path):
                 i += 1
             sexp = content[start:i]
 
-            # Check if this is a context_flags related stanza
-            if 'context_flags' in sexp:
+            # Check if this is a context_flags related stanza or generates sexp files
+            # we pre-generated (clibs.sexp, cxxflags.sexp, flags.sexp, cflags.sexp)
+            # Use flexible matching - look for the filename anywhere in the stanza
+            sexp_lower = sexp.lower()
+            should_remove = (
+                'context_flags' in sexp_lower or
+                'clibs.sexp' in sexp_lower or
+                'cxxflags.sexp' in sexp_lower or
+                'cflags.sexp' in sexp_lower or
+                # Be careful with flags.sexp - it's generic, only match if it's a target
+                ('flags.sexp' in sexp_lower and '(target' in sexp_lower)
+            )
+            if should_remove:
                 # Replace with comment showing what was removed
                 first_line = sexp.split('\n')[0][:60]
                 result.append(f'; DISABLED for cross-compilation: {first_line}...\n')
@@ -70,10 +81,22 @@ def remove_context_flags_stanzas(dune_path):
 
 def main():
     src_dir = os.environ.get('SRC_DIR', '.')
+    opam_dir = f"{src_dir}/opam"
+    cwd = os.getcwd()
 
-    print("Removing context_flags stanzas from mccs dune files...")
-    remove_context_flags_stanzas(f"{src_dir}/src_ext/mccs/src/dune")
-    remove_context_flags_stanzas(f"{src_dir}/src_ext/mccs/src/glpk/dune")
+    # Check both possible locations (with and without opam subdirectory)
+    # Also check relative to cwd (cross-compile.sh runs from ${SRC_DIR}/opam)
+    if os.path.isdir(f"{opam_dir}/src_ext"):
+        base = opam_dir
+    elif os.path.isdir(f"{cwd}/src_ext"):
+        base = cwd
+    else:
+        base = src_dir
+
+    print(f"Removing context_flags stanzas from mccs dune files...")
+    print(f"  SRC_DIR={src_dir}, cwd={cwd}, base={base}")
+    remove_context_flags_stanzas(f"{base}/src_ext/mccs/src/dune")
+    remove_context_flags_stanzas(f"{base}/src_ext/mccs/src/glpk/dune")
 
 
 if __name__ == '__main__':

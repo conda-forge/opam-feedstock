@@ -86,6 +86,37 @@ generate_native_man_pages() {
   [[ -d "${opam_dir}" ]] || opam_dir="${SRC_DIR}"
   cd "${opam_dir}"
 
+  # Force native OCaml environment - set CONDA_OCAML_* to build (native) compilers
+  # This is critical for macOS cross-compilation where ocaml-cross-compilers is installed
+  # The conda-ocaml-* wrappers read these variables to determine which actual compiler to use
+  export OCAMLLIB="${BUILD_PREFIX}/lib/ocaml"
+  export OCAMLPATH="${BUILD_PREFIX}/lib/ocaml"
+
+  # Set CONDA_OCAML_* to native build compilers (not cross-compilers)
+  local build_cc
+  build_cc="$(get_build_c_compiler)"
+  export CONDA_OCAML_CC="${build_cc:-cc}"
+  export CONDA_OCAML_AS="${CONDA_TOOLCHAIN_BUILD:+${CONDA_TOOLCHAIN_BUILD}-}as"
+  export CONDA_OCAML_AR="${CONDA_TOOLCHAIN_BUILD:+${CONDA_TOOLCHAIN_BUILD}-}ar"
+  export CONDA_OCAML_LD="${CONDA_TOOLCHAIN_BUILD:+${CONDA_TOOLCHAIN_BUILD}-}ld"
+
+  # Create native-only findlib.conf to prevent cross-compiler library discovery
+  # The conda findlib package may have cross-compiler paths in its config
+  local native_findlib_conf="${SRC_DIR}/_native_findlib.conf"
+  if [[ -f "${BUILD_PREFIX}/etc/findlib.conf" ]]; then
+    # Patch out cross-compiler paths, keep only native lib/ocaml
+    sed -e "s|${BUILD_PREFIX}/lib/ocaml-cross-compilers/[^:\"]*|${BUILD_PREFIX}/lib/ocaml|g" \
+        "${BUILD_PREFIX}/etc/findlib.conf" > "${native_findlib_conf}"
+    export OCAMLFIND_CONF="${native_findlib_conf}"
+  fi
+
+  echo "Forcing native OCaml environment for man page generation:"
+  echo "  OCAMLLIB=${OCAMLLIB}"
+  echo "  OCAMLPATH=${OCAMLPATH}"
+  echo "  OCAMLFIND_CONF=${OCAMLFIND_CONF:-<not set>}"
+  echo "  CONDA_OCAML_CC=${CONDA_OCAML_CC}"
+  echo "  CONDA_OCAML_AS=${CONDA_OCAML_AS}"
+
   if ! "${dune}" build --profile=release --root . --promote-install-files -- opam.install opam-installer.install 2>&1; then
     warn "Native build failed, skipping man page generation"
     touch "${native_man_dir}/.failed"
@@ -117,7 +148,8 @@ generate_native_man_pages() {
   fi
 
   # Preserve menhir-generated parser files before cleaning _build
-  # Only copy files generated from .mly (architecture-independent)
+  # Opam uses vendored menhir which would be compiled for arm64 during cross-compile.
+  # Pre-generate parsers here with native menhir, then remove menhir stanzas later.
   echo "Preserving menhir-generated parser files..."
   local build_dir="${opam_dir}/_build/default"
 
@@ -143,9 +175,20 @@ generate_native_man_pages() {
     fi
   done
 
+  # vendored menhir's own parser (src_ext/menhir/src/stage2/parser.mly)
+  if [[ -f "${build_dir}/src_ext/menhir/src/stage2/parser.ml" ]]; then
+    cp -v "${build_dir}/src_ext/menhir/src/stage2/parser.ml" \
+          "${opam_dir}/src_ext/menhir/src/stage2/"
+    cp -v "${build_dir}/src_ext/menhir/src/stage2/parser.mli" \
+          "${opam_dir}/src_ext/menhir/src/stage2/" 2>/dev/null || true
+  fi
+
   # Clean native build artifacts before cross-compilation
   echo "Cleaning native _build..."
   rm -rf "${opam_dir}/_build"
+
+  # Note: CONDA_OCAML_* and OCAMLLIB/OCAMLPATH will be set properly by
+  # configure_cross_environment() for the cross-compilation phase
 
   echo "Pre-generated man pages:"
   ls -la "${native_man_dir}/"*.1 2>/dev/null | head -10 || echo "  (none generated)"
@@ -230,80 +273,45 @@ setup_cross_c_compilers() {
 configure_cross_environment() {
   echo "  Configuring cross-compilation environment variables..."
 
-  # For conda-ocaml-cc wrapper (Dune reads c_compiler from ocamlc -config)
-  export CONDA_OCAML_CC="$(get_target_c_compiler)"
+  local cross_ocaml_lib="${BUILD_PREFIX}/lib/ocaml-cross-compilers/${CONDA_TOOLCHAIN_HOST}/lib/ocaml"
+  local native_ocaml_lib="${BUILD_PREFIX}/lib/ocaml"
+
+  # CONDA_OCAML_* variables: Required for conda-ocaml-* wrappers
+  # Dune reads tools from ocamlc -config (e.g., c_compiler="conda-ocaml-cc")
+  # and calls them directly. These wrappers need environment variables to know
+  # which actual cross-tools to use. Without these, they fall back to native tools.
+  # macOS uses clang, Linux uses gcc
   if is_macos; then
+    export CONDA_OCAML_CC="${CONDA_TOOLCHAIN_HOST}-clang"
+  else
+    export CONDA_OCAML_CC="${CONDA_TOOLCHAIN_HOST}-gcc"
+  fi
+  export CONDA_OCAML_AS="${CONDA_TOOLCHAIN_HOST}-as"
+  export CONDA_OCAML_AR="${CONDA_TOOLCHAIN_HOST}-ar"
+  export CONDA_OCAML_LD="${CONDA_TOOLCHAIN_HOST}-ld"
+  if is_macos; then
+    # Suppress linker warnings about deployment target mismatch
+    # (OCaml has 10.13 baked in, but we're building for 11.0+)
+    export LDFLAGS="${LDFLAGS:-} -Wl,-w"
     export CONDA_OCAML_MKEXE="${CONDA_OCAML_CC}"
     export CONDA_OCAML_MKDLL="${CONDA_OCAML_CC} -dynamiclib"
   else
     export CONDA_OCAML_MKEXE="${CONDA_OCAML_CC} -Wl,-E -ldl"
     export CONDA_OCAML_MKDLL="${CONDA_OCAML_CC} -shared"
   fi
-  export CONDA_OCAML_AR="${CONDA_TOOLCHAIN_HOST}-ar"
-  export CONDA_OCAML_AS="${CONDA_TOOLCHAIN_HOST}-as"
-  export CONDA_OCAML_LD="${CONDA_TOOLCHAIN_HOST}-ld"
+  echo "    CONDA_OCAML_CC: ${CONDA_OCAML_CC}"
+  echo "    CONDA_OCAML_MKEXE: ${CONDA_OCAML_MKEXE}"
 
-  echo "    Cross-compiler environment:"
-  echo "      CC=${CC}, CXX=${CXX:-}, AR=${AR}"
-  echo "      CONDA_OCAML_CC=${CONDA_OCAML_CC}"
+  # OCAMLPATH: Dune library discovery (before compiler invocation)
+  # Cross-first so compilation uses cross libs, native-fallback for module resolution
+  export OCAMLPATH="${cross_ocaml_lib}:${native_ocaml_lib}"
+  echo "    OCAMLPATH: ${OCAMLPATH}"
 
-  # Set QEMU_LD_PREFIX for binfmt_misc/QEMU to find aarch64 dynamic linker
-  export QEMU_LD_PREFIX="${BUILD_PREFIX}/${CONDA_TOOLCHAIN_HOST}/sysroot"
-
-  # Set OCAMLLIB, LIBRARY_PATH and LDFLAGS so ocamlmklib can find cross-compiled OCaml runtime
-  # OCAMLLIB is CRITICAL - ocamlmklib uses it to find libasmrun.a and other runtime libs
-  local cross_ocaml_lib="${BUILD_PREFIX}/lib/ocaml-cross-compilers/${CONDA_TOOLCHAIN_HOST}/lib/ocaml"
-  if [[ -d "${cross_ocaml_lib}" ]]; then
-    export OCAMLLIB="${cross_ocaml_lib}"
-    export LIBRARY_PATH="${cross_ocaml_lib}:${PREFIX}/lib:${LIBRARY_PATH:-}"
-    export LDFLAGS="-L${cross_ocaml_lib} -L${PREFIX}/lib ${LDFLAGS:-}"
-    echo "    Set OCAMLLIB for ocamlmklib: ${OCAMLLIB}"
-    echo "    Set LIBRARY_PATH: ${cross_ocaml_lib}"
-    echo "    Set LDFLAGS: ${LDFLAGS}"
-
-    # OCAMLPATH strategy for cross-compilation:
-    # - Cross path FIRST: so compiler finds cross-compiled libraries for linking
-    # - Native path SECOND: so dune's runtime can load native stub libraries (dllunixbyt.so)
-    # This ordering ensures compilation uses cross libs while dune can still run
-    local native_ocaml_lib="${BUILD_PREFIX}/lib/ocaml"
-    export OCAMLPATH="${cross_ocaml_lib}:${native_ocaml_lib}"
-    echo "    Set OCAMLPATH (cross-first, native-fallback): ${OCAMLPATH}"
-
-    # CAML_LD_LIBRARY_PATH: OCaml's stub library search path (takes precedence over OCAMLPATH)
-    # OCaml bytecode runtime (used by dune) dynamically loads .so stub files.
-    # Dune is native x86_64, so it needs native .so files, not cross-compiled aarch64 ones.
-    # CAML_LD_LIBRARY_PATH is checked BEFORE OCAMLPATH-derived stublibs directories.
-    local native_stublibs="${native_ocaml_lib}/stublibs"
-    export CAML_LD_LIBRARY_PATH="${native_stublibs}"
-    echo "    Set CAML_LD_LIBRARY_PATH (native stublibs): ${CAML_LD_LIBRARY_PATH}"
-
-    # Also set LD_LIBRARY_PATH as fallback (for dlopen() after OCaml finds the library)
-    export LD_LIBRARY_PATH="${native_stublibs}:${LD_LIBRARY_PATH:-}"
-    echo "    Set LD_LIBRARY_PATH (native stublibs): ${native_stublibs}"
-
-    # Debug: show what's in the cross-compiler lib
-    echo "    Cross-compiled OCaml runtime files:"
-    ls -la "${cross_ocaml_lib}/"*.a 2>/dev/null | head -5 || echo "      (no .a files found)"
-    echo "    Cross-compiled OCaml packages:"
-    ls -d "${cross_ocaml_lib}"/*/ 2>/dev/null | head -10 || echo "      (no subdirectories found)"
-  fi
-}
-
-create_macos_ocamlmklib_wrapper() {
-  echo "  Creating macOS ocamlmklib wrapper..."
-  local real_ocamlmklib="${BUILD_PREFIX}/bin/ocamlmklib"
-
-  if [[ -f "${real_ocamlmklib}" ]] && [[ ! -f "${real_ocamlmklib}.real" ]]; then
-    mv "${real_ocamlmklib}" "${real_ocamlmklib}.real"
-    cat > "${real_ocamlmklib}" << 'WRAPPER_EOF'
-#!/bin/bash
-# Wrapper to add -undefined dynamic_lookup for macOS shared lib creation
-# This allows _caml_* symbols to remain unresolved until runtime
-exec "${0}.real" -ldopt "-Wl,-undefined,dynamic_lookup" "$@"
-WRAPPER_EOF
-    chmod +x "${real_ocamlmklib}"
-    echo "    Created wrapper: ${real_ocamlmklib}"
-  fi
+  # CAML_LD_LIBRARY_PATH: Native stubs for dune runtime
+  # Dune (native x86_64) needs native .so stubs, not cross-compiled aarch64 ones
+  local native_stublibs="${native_ocaml_lib}/stublibs"
+  export CAML_LD_LIBRARY_PATH="${native_stublibs}"
+  echo "    CAML_LD_LIBRARY_PATH: ${native_stublibs}"
 }
 
 patch_dune_for_cross() {
@@ -360,6 +368,7 @@ patch_opam_makefile_config() {
 
 clear_build_caches() {
   echo "  Clearing build caches for cross-compilation..."
+  echo "  SRC_DIR=${SRC_DIR}"
 
   # Clear any _build directories from native man page generation
   rm -rf "${SRC_DIR}/_build" 2>/dev/null || true
@@ -373,8 +382,13 @@ clear_build_caches() {
     rm -rf "${ext_dir}/_build" 2>/dev/null || true
   done
 
-  # Remove any object files from previous builds
+  # Remove object files and static libraries from previous builds
+  # CRITICAL: Dune promotes .a files to source tree during native build
+  # These are x86_64 and will cause "skipping incompatible" errors during cross-compile
+  echo "  Looking for .a files to remove..."
+  find "${SRC_DIR}" -name "*.a" -not -path "*/ocaml/*" 2>/dev/null | head -10 || true
   find "${SRC_DIR}" -name "*.o" -delete 2>/dev/null || true
+  find "${SRC_DIR}" -name "*.a" -not -path "*/ocaml/*" -delete 2>/dev/null || true
   echo "  Build caches cleared"
 }
 
