@@ -1,118 +1,164 @@
 context:
-  name: ocaml
+  build_number: 1
+  name: opam
   version: 2.5.0
+
   library: ${{ "Library/" if not unix }}
   m2: ${{ "m2-" if not unix }}
+  sh: ${{ "sh" if unix else "bat" }}
 
-package:
-  name: opam
+recipe:
+  name: opam-packages
   version: ${{ version }}
 
 source:
-  - url: https://github.com/ocaml/opam/releases/download/${{ version }}/opam-full-${{ version }}.tar.gz
+  - url: https://github.com/ocaml/${{ name }}/releases/download/${{ version }}/${{ name }}-full-${{ version }}.tar.gz
     sha256: 25fb98f962c4227c1261e142afc68a416778e6e819600bd5ee3ec4a18ae1e238
+    target_directory: opam
 
 build:
-  number: 0
-
-requirements:
-  build:
-    - ${{ compiler('c') }}
-    - ${{ compiler('cxx') }}
-    - ${{ stdlib('c') }}
-    - ${{ m2 }}bash >=5.2
-    - ${{ m2 }}bzip2
-    - ${{ m2 }}findutils
-    - ${{ m2 }}gawk
-    - ${{ m2 }}grep
-    - ${{ m2 }}make
-    - ${{ m2 }}sed
-    - binutils
-    - curl
-    - git
-    - ocaml >=5.3.0
-    - if: unix
-      then:
-        # OCaml compiler has zstd paths embedded from its build environment.
-        # We need zstd in build env so those paths resolve correctly.
-        - file
-        - zstd
-      else:
-        - ${{ m2 }}coreutils
-        - ${{ m2 }}diffutils
-        - ${{ m2 }}which
-    - if: osx
-      then:
-        - lld
-        - llvm-tools
-  host:
-    - zstd
-    # We need to 2-phase as these do not exist yet for arm64 and non-unix
-    # We add opam bare for all archs, then later we update below
-    # - ocamlbuild
-    # - ocaml-findlib
-
-tests:
-  - package_contents:
-      bin:
-        - opam
-        - opam-installer
-      files:
-        - if: build_platform == target_platform
-          then:
-            - ${{ library }}share/man/man1/opam*
-
-  - script:
-      - if: build_platform == target_platform
-        then: |
-            opam --version | grep ${{ version }}
-        else: |
-            echo "OCaml 5.x GC segfaults under QEMU"
-    requirements:
-      run:
-        - ${{ m2 }}grep
-
-  # Functional tests - exercise core opam functionality to catch build issues
-  # (broken linking, missing libraries, OCaml runtime problems)
-  # Unix: bash. Windows: powershell (avoids WSL/MSYS2 PATH issues).
-  # Cross-compile: skipped (QEMU + OCaml 5.x GC incompatibility).
-  - script:
-      - if: unix and build_platform == target_platform
-        then: |
-          export OPAMROOT=./opam_test
-          mkdir -p opam_test
-          opam init --bare --no-setup --bypass-checks
-          opam config list
-          opam switch create test --empty
-          eval $(opam env --switch=test)
-          opam list --installed
-          opam switch list
-          opam switch remove test --yes
-          rm -rf opam_test
-      - if: unix and build_platform != target_platform
-        then: |
-          echo "Skipping functional tests (cross-compile: QEMU + OCaml 5.x GC issue)"
-
-  - script:
-      - if: win
+  number: ${{ build_number }}
+  dynamic_linking:
+    missing_dso_allowlist:
+      - if: not unix
         then:
-          interpreter: powershell
-          content: |
-            $env:OPAMROOT = "./opam_test"
-            New-Item -ItemType Directory -Force -Path opam_test
-            opam init --bare --no-setup --bypass-checks
-            opam config list
-            opam switch create test --empty
-            opam list --installed
-            opam switch list
-            opam switch remove test --yes
-            Remove-Item -Recurse -Force opam_test
+          - C:/Windows/system32/SHLWAPI.dll
+          - C:/Windows/system32/VERSION.dll
+
+outputs:
+  - package:
+      name: ${{ name }}
+      version: ${{ version }}
+    requirements:
+      build:
+        - if: unix
+          then:
+            - ${{ compiler("c") }}
+            - ${{ compiler("cxx") }}
+            - ${{ stdlib("c") }}
+          else:
+            - ${{ compiler("m2w64_c") }}
+            - ${{ compiler("m2w64_cxx") }}
+            - ${{ stdlib("m2w64_c") }}
+        - ${{ m2 }}bash >=5.2
+        - ${{ m2 }}bzip2
+        - ${{ m2 }}findutils
+        - ${{ m2 }}gawk
+        - ${{ m2 }}grep
+        - ${{ m2 }}make
+        - ${{ m2 }}sed
+        - ocaml-cppo
+        - ocaml-dune
+        - ocaml-menhir
+        - binutils
+        - curl
+        - git
+        - ocaml >=5.3.0 *_12
+        - if: build_platform != target_platform
+          then:
+            - python >=3.9
+        - if: unix
+          then:
+            # OCaml compiler has zstd paths embedded from its build environment.
+            # We need zstd in build env so those paths resolve correctly.
+            - file
+            - unzip
+            - zstd
+          else:
+            - ${{ m2 }}coreutils
+            - ${{ m2 }}diffutils
+            - ${{ m2 }}which
+        - if: osx
+          then:
+            - lld
+            - llvm-tools
+      host:
+        - if: aarch64 or ppc64le
+          then:
+            - zstd
+      run:
+        - c-compiler
+        - curl
+        - git
+        - if: unix
+          then:
+            - make
+            - rsync
+            - unzip
+        - if: linux
+          then:
+            - bubblewrap
+          # Once we have ocaml 5.4.0_1
+          # - ocaml-compiler
+    tests:
+      # Package contents validation (using brace expansion for conciseness)
+      - package_contents:
+          strict: true
+          bin:
+            - opam
+            - opam-installer
+          files:
+            - ${{ library }}share/man/man1/opam*
+            - etc/conda/activate.d/opam-activate.${{ sh }}
+            - etc/conda/deactivate.d/opam-deactivate.${{ sh }}
+            - ${{ library }}share/opam/conda/.opam-switch/{environment,lock,switch-config}
+            - ${{ library }}share/opam/{config,config.lock,lock}
+            - ${{ library }}share/opam/opam-init/complete.{sh,zsh}
+            - ${{ library }}share/opam/opam-init/hooks/sandbox.{sh,sh.hash}
+            - ${{ library }}share/opam/opam-init/init.{cmd,csh,fish,ps1,sh,zsh}
+            - ${{ library }}share/opam/opam-init/variables.{cmd,csh,fish,ps1,sh}
+            - ${{ library }}share/opam/repo/{default/repo,lock,repos-config}
+            - etc/conda/test-files/*
+
+      # Architecture verification - Unix only (uses otool/readelf)
+      - if: unix
+        then:
+          script: bash testing/test-opam-arch.sh
+          files:
+            recipe:
+              - testing/test-opam-arch.sh
+          requirements:
+            run:
+              - if: linux
+                then:
+                  - binutils
+
+      # Version check - native builds OR Linux cross-compile (QEMU/binfmt available)
+      # macOS cross-compile: can't run ARM64 binaries, skip this test
+      - if: build_platform == target_platform or linux
+        then:
+          script: |
+            python testing/test-opam-version.py
+          files:
+            recipe:
+              - testing/test-opam-version.py
+          requirements:
+            run:
+              - python >=3.9
+              - ocaml
+
+      # Functional tests - native builds OR Linux cross-compile
+      # These run opam commands; Linux uses QEMU, macOS cross can't run ARM64
+      - if: build_platform == target_platform or linux
+        then:
+          script: |
+            python testing/test-opam-functional.py
+            python testing/test-opam-activation.py
+          files:
+            recipe:
+              - testing/test-opam-functional.py
+              - testing/test-opam-activation.py
+          requirements:
+            run:
+              - python >=3.9
+              - ocaml
+              - ocaml-dune
 
 about:
   homepage: https://github.com/ocaml/opam
   license: LGPL-2.1-only
   license_family: LGPL
-  license_file: LICENSE
+  license_file: opam/LICENSE
   summary: Objective Caml (OCaml) is an implementation of the ML language.
   description: |
     opam is a source-based package manager. It supports multiple simultaneous compiler
