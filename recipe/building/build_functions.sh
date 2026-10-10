@@ -24,7 +24,7 @@ readonly OPAM_STUB_HEADER_LINES=73
 # Platform detection
 is_macos() { [[ "${target_platform}" == "osx-"* ]]; }
 is_linux() { [[ "${target_platform}" == "linux-"* ]]; }
-is_linux_cross() { [[ "${target_platform}" == *"-aarch64" ]] || [[ "${target_platform}" == *"-ppc64le" ]] || [[ "${target_platform}" == *"-riscv64" ]]; }
+is_linux_cross() { [[ "${target_platform}" == *"-ppc64le" ]] || [[ "${target_platform}" == *"-riscv64" ]] || [[ "${target_platform}" == *"-s390x" ]]; }
 is_non_unix() { [[ "${target_platform}" != "linux-"* ]] && [[ "${target_platform}" != "osx-"* ]]; }
 is_cross_compile() { [[ "${CONDA_BUILD_CROSS_COMPILATION:-}" == "1" ]]; }
 build_is_macos() { [[ "${build_platform:-${target_platform}}" == "osx-"* ]]; }
@@ -465,6 +465,52 @@ apply_windows_workarounds() {
   popd > /dev/null
 
   echo "Windows workarounds applied successfully"
+}
+
+# win-arm64: mccs is C++. Dune compiles .cpp through ocamlc's c_compiler
+# (conda-ocaml-cc -> zig cc), which only adds the libc++ headers when told to
+# link libc++, and flexlink cannot resolve -lc++. Pre-generate the
+# context_flags sexps: -lc++ on the compile line, zig's libc++ runtime archives by path.
+setup_win_arm64_mccs_cxx() {
+  local probe_dir cxx_libs lib found dir python_exe
+  probe_dir="$(cygpath -m "${SRC_DIR}/_zig_cxx_probe")"
+  mkdir -p "${probe_dir}"
+  cat > "${probe_dir}/probe.cpp" << 'EOF'
+#include <atomic>
+#include <cstdio>
+#include <vector>
+int main() { std::atomic<int> a{1}; std::vector<int> v{a.load()}; std::printf("%d\n", v[0]); return 0; }
+EOF
+  echo "=== win-arm64: C++ (mccs) via zig ==="
+  "${CC}" -x c++ -std=gnu++11 -lc++ -c "${probe_dir}/probe.cpp" -o "${probe_dir}/probe.o" \
+    || { echo "ERROR: zig cc -x c++ -lc++ cannot compile C++"; return 1; }
+  # ZIG_VERBOSE_LINK prints the linker line, which names the libc++ archives
+  # zig built (or reused) in whatever cache its wrapper points at.
+  ZIG_VERBOSE_LINK=1 "${CXX}" "${probe_dir}/probe.cpp" -o "${probe_dir}/probe.exe" > "${probe_dir}/link.log" 2>&1 \
+    || { cat "${probe_dir}/link.log"; echo "ERROR: zig c++ probe link failed"; return 1; }
+  cxx_libs=""
+  for lib in c++.lib c++abi.lib unwind.lib; do
+    found="$(grep -a -o -E "[^ \"']*[\\/]${lib//+/\\+}" "${probe_dir}/link.log" | head -n 1 || true)"
+    if [[ -n "${found}" ]]; then
+      cxx_libs="${cxx_libs} \"$(cygpath -m "${found}")\""
+    fi
+  done
+  if [[ "${cxx_libs}" != *'/c++.lib"'* ]]; then
+    echo "ERROR: c++.lib not named in the zig link line; link.log:"
+    cat "${probe_dir}/link.log"
+    env | grep -a '^ZIG' || true
+    return 1
+  fi
+  echo "  C++ runtime:${cxx_libs}"
+  for dir in src_ext/mccs/src src_ext/mccs/src/glpk; do
+    [[ -d "${dir}" ]] || continue
+    echo "(-Wall -Wextra -Wno-unused-parameter -x c++ -std=gnu++11 -DUSEGLPK -lc++)" > "${dir}/cxxflags.sexp"
+    echo "(-Wall -Wextra -Wno-unused-parameter -DUSEGLPK)" > "${dir}/cflags.sexp"
+    echo "(${cxx_libs# })" > "${dir}/clibs.sexp"
+    echo "()" > "${dir}/flags.sexp"
+  done
+  python_exe="$(command -v python3 || command -v python)"
+  "${python_exe}" "${RECIPE_DIR}/building/remove_context_flags_stanzas.py"
 }
 
 # ==============================================================================
