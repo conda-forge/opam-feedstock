@@ -17,6 +17,10 @@ source "${RECIPE_DIR}/building/build_functions.sh"
 
 echo "=== PHASE 0: Environment Setup ==="
 
+# Recent dune enables its shared cache by default; on Windows it resolves to a
+# relative path and dune crashes creating it. Not useful for a one-shot build.
+export DUNE_CACHE=disabled
+
 # macOS: OCaml compiler has @rpath/libzstd.1.dylib embedded but rpath doesn't
 # resolve in build environment. Set DYLD_FALLBACK_LIBRARY_PATH so executables
 # built by OCaml can find libzstd at runtime.
@@ -71,15 +75,36 @@ else
     echo "  menhir: $(command -v menhir)"
   fi
 
+  # win-arm64: configure looks for an x86 cl.exe to build opam-putenv and fails
+  # hard under ARM64 MSVC. apply_windows_workarounds drops the putenv dune rules
+  # anyway, so neutralise that one check.
+  if [[ "${target_platform}" == "win-arm64" ]]; then
+    sed -i 's/as_fn_error \$? "\${COMP_ARCH} C compiler not found - opam-putenv cannot be built"/:/' configure
+    # zig activation only exports ZIG_*; the vs (c_stdlib) activation then sets
+    # CC/CXX=cl.exe. Point everything at the zig wrappers.
+    export CC="$(cygpath -m "${ZIG_CC}")"
+    export CXX="$(cygpath -m "${ZIG_CXX}")"
+    export CONDA_OCAML_CC="${CC}"
+    echo "win-arm64: CC=${CC} CXX=${CXX} FLEXLINKFLAGS=${FLEXLINKFLAGS:-}"
+  fi
+
+  CONFIGURE_EXTRA=""
+  if [[ "${target_platform}" == "win-arm64" ]]; then
+    # Static mingw link line assumes native gcc (-lunixnat, -l:libstdc++.a);
+    # ocaml here is bytecode-only with zig. Let dune autolink instead.
+    CONFIGURE_EXTRA="--disable-static"
+  fi
+
   # Configure with external dune (if available) + vendored OCaml libraries
   if [[ -n "${EXTERNAL_DUNE}" ]]; then
     echo "Using external dune: ${EXTERNAL_DUNE}"
     ./configure --prefix="${OPAM_INSTALL_PREFIX}" \
       --with-vendored-deps \
+      ${CONFIGURE_EXTRA:+"${CONFIGURE_EXTRA}"} \
       --with-dune="${EXTERNAL_DUNE}" > /dev/null 2>&1 || { cat config.log; exit 1; }
   else
     echo "WARNING: dune not in PATH, using vendored (slower)"
-    ./configure --prefix="${OPAM_INSTALL_PREFIX}" --with-vendored-deps > /dev/null 2>&1 || { cat config.log; exit 1; }
+    ./configure --prefix="${OPAM_INSTALL_PREFIX}" --with-vendored-deps ${CONFIGURE_EXTRA:+"${CONFIGURE_EXTRA}"} > /dev/null 2>&1 || { cat config.log; exit 1; }
   fi
 
   # ==============================================================================
@@ -88,6 +113,32 @@ else
 
   if is_non_unix; then
     apply_windows_workarounds
+    if [[ "${target_platform}" == "win-arm64" ]]; then
+      setup_win_arm64_mccs_cxx
+    fi
+    # opam --help=groff (man page rules) resolves its default root via HOME and
+    # falls back to SHGetKnownFolderPath, which fails on CI. Give it a real home.
+    OPAM_BUILD_HOME="$(cygpath -m "${SRC_DIR}/_home")"
+    mkdir -p "${OPAM_BUILD_HOME}/.opam"
+    export HOME="${OPAM_BUILD_HOME}"
+    export USERPROFILE="${OPAM_BUILD_HOME}"
+    export OPAMROOT="${OPAM_BUILD_HOME}/.opam"
+    # MSVC ocamlopt runs ml64 through cmd.exe, which stops resolving commands once
+    # PATH nears its ~8191 char limit; vcvars pushes it there. Drop duplicate and
+    # missing dirs, and keep the MSVC bin dir first.
+    if [[ "$(ocamlc -config-var c_compiler 2>/dev/null)" == cl* ]]; then
+      MSVC_BIN_DIR="$(dirname "$(command -v cl.exe)")"
+      _short_path=""
+      IFS=: read -ra _path_dirs <<< "${MSVC_BIN_DIR}:${PATH}"
+      for _d in "${_path_dirs[@]}"; do
+        [[ -d "${_d}" ]] || continue
+        case ":${_short_path}:" in
+          *":${_d}:"*) ;;
+          *) _short_path="${_short_path:+${_short_path}:}${_d}" ;;
+        esac
+      done
+      export PATH="${_short_path}"
+    fi
     # Vendored dune patch only needed if not using external dune
     if [[ -z "${EXTERNAL_DUNE}" ]] && [[ -d "src_ext/dune-local" ]]; then
       patch -p1 -d src_ext/dune-local < "${RECIPE_DIR}/patches/xxxx-fix-dune-which-double-exe-on-windows.patch"

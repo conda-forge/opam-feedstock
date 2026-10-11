@@ -1,7 +1,7 @@
 About opam-feedstock
 ====================
 
-Feedstock license: [BSD-3-Clause](https://github.com/conda-forge/opam-feedstock-unix-feedstock/blob/main/LICENSE.txt)
+Feedstock license: [BSD-3-Clause](https://github.com/conda-forge/opam-feedstock/blob/main/LICENSE.txt)
 
 Home: https://github.com/ocaml/opam
 
@@ -18,59 +18,38 @@ Current build status
 ====================
 
 
-<table>
+<table><tr>
+    <td>GitHub Actions</td>
+    <td>
+      <a href="https://github.com/conda-forge/opam-feedstock/actions/workflows/conda-build.yml">
+        <img src="https://github.com/conda-forge/opam-feedstock/actions/workflows/conda-build.yml/badge.svg?event=push&branch=main">
+      </a>
+    </td>
+  </tr>
     
   <tr>
     <td>Azure</td>
     <td>
       <details>
         <summary>
-          <a href="https://dev.azure.com/conda-forge/feedstock-builds/_build/latest?definitionId=None&branchName=main">
-            <img src="https://dev.azure.com/conda-forge/feedstock-builds/_apis/build/status/opam-feedstock-unix-feedstock?branchName=main">
+          <a href="https://dev.azure.com/conda-forge/feedstock-builds/_build/latest?definitionId=15649&branchName=main">
+            <img src="https://dev.azure.com/conda-forge/feedstock-builds/_apis/build/status/opam-feedstock?branchName=main">
           </a>
         </summary>
         <table>
           <thead><tr><th>Variant</th><th>Status</th></tr></thead>
           <tbody><tr>
-              <td>linux_64</td>
-              <td>
-                <a href="https://dev.azure.com/conda-forge/feedstock-builds/_build/latest?definitionId=None&branchName=main">
-                  <img src="https://dev.azure.com/conda-forge/feedstock-builds/_apis/build/status/opam-feedstock-unix-feedstock?branchName=main&jobName=linux&configuration=linux%20linux_64_" alt="variant">
-                </a>
-              </td>
-            </tr><tr>
-              <td>linux_aarch64</td>
-              <td>
-                <a href="https://dev.azure.com/conda-forge/feedstock-builds/_build/latest?definitionId=None&branchName=main">
-                  <img src="https://dev.azure.com/conda-forge/feedstock-builds/_apis/build/status/opam-feedstock-unix-feedstock?branchName=main&jobName=linux&configuration=linux%20linux_aarch64_" alt="variant">
-                </a>
-              </td>
-            </tr><tr>
-              <td>linux_ppc64le</td>
-              <td>
-                <a href="https://dev.azure.com/conda-forge/feedstock-builds/_build/latest?definitionId=None&branchName=main">
-                  <img src="https://dev.azure.com/conda-forge/feedstock-builds/_apis/build/status/opam-feedstock-unix-feedstock?branchName=main&jobName=linux&configuration=linux%20linux_ppc64le_" alt="variant">
-                </a>
-              </td>
-            </tr><tr>
               <td>osx_64</td>
               <td>
-                <a href="https://dev.azure.com/conda-forge/feedstock-builds/_build/latest?definitionId=None&branchName=main">
-                  <img src="https://dev.azure.com/conda-forge/feedstock-builds/_apis/build/status/opam-feedstock-unix-feedstock?branchName=main&jobName=osx&configuration=osx%20osx_64_" alt="variant">
+                <a href="https://dev.azure.com/conda-forge/feedstock-builds/_build/latest?definitionId=15649&branchName=main">
+                  <img src="https://dev.azure.com/conda-forge/feedstock-builds/_apis/build/status/opam-feedstock?branchName=main&jobName=osx&configuration=osx%20osx_64_" alt="variant">
                 </a>
               </td>
             </tr><tr>
               <td>osx_arm64</td>
               <td>
-                <a href="https://dev.azure.com/conda-forge/feedstock-builds/_build/latest?definitionId=None&branchName=main">
-                  <img src="https://dev.azure.com/conda-forge/feedstock-builds/_apis/build/status/opam-feedstock-unix-feedstock?branchName=main&jobName=osx&configuration=osx%20osx_arm64_" alt="variant">
-                </a>
-              </td>
-            </tr><tr>
-              <td>win_64</td>
-              <td>
-                <a href="https://dev.azure.com/conda-forge/feedstock-builds/_build/latest?definitionId=None&branchName=main">
-                  <img src="https://dev.azure.com/conda-forge/feedstock-builds/_apis/build/status/opam-feedstock-unix-feedstock?branchName=main&jobName=win&configuration=win%20win_64_" alt="variant">
+                <a href="https://dev.azure.com/conda-forge/feedstock-builds/_build/latest?definitionId=15649&branchName=main">
+                  <img src="https://dev.azure.com/conda-forge/feedstock-builds/_apis/build/status/opam-feedstock?branchName=main&jobName=osx&configuration=osx%20osx_arm64_" alt="variant">
                 </a>
               </td>
             </tr>
@@ -91,49 +70,93 @@ Current release info
 Installing opam
 ===============
 
-Installing `opam` from the `conda-forge` channel can be achieved by adding `conda-forge` to your channels with:
+Installing `opam` from the `conda-forge/label/ocaml_experimental` channel can be achieved by adding `conda-forge/label/ocaml_experimental` to your channels with:
 
 ```
-conda config --add channels conda-forge
+conda config --add channels conda-forge/label/ocaml_experimental
 conda config --set channel_priority strict
 ```
 
-Once the `conda-forge` channel has been enabled, `opam` can be installed with `conda`:
+How to use
+----------
+
+<details>
+<summary>With conda</summary>
 
 ```
 conda install opam
 ```
 
-or with `mamba`:
+</details>
+
+<details>
+<summary>With mamba</summary>
 
 ```
 mamba install opam
 ```
 
-It is possible to list all of the versions of `opam` available on your platform with `conda`:
+</details>
+
+<details>
+<summary>With pixi</summary>
 
 ```
-conda search opam --channel conda-forge
+# for adding to your local project
+pixi add opam
+# for installing globally
+pixi global install opam
 ```
 
-or with `mamba`:
+</details>
+
+Search package versions
+-----------------------
+
+It is possible to list all of the versions of `opam` available on your platform:
+
+<details>
+<summary>With conda</summary>
 
 ```
-mamba search opam --channel conda-forge
+conda search opam --channel conda-forge/label/ocaml_experimental
 ```
 
-Alternatively, `mamba repoquery` may provide more information:
+</details>
+
+<details>
+<summary>With mamba</summary>
+
+```
+mamba search opam --channel conda-forge/label/ocaml_experimental
+```
+
+</details>
+
+<details>
+<summary>With pixi</summary>
+
+```
+pixi search opam --channel conda-forge/label/ocaml_experimental
+```
+
+</details>
+
+<details>
+<summary>With mamba repoquery, which may provide more information</summary>
 
 ```
 # Search all versions available on your platform:
-mamba repoquery search opam --channel conda-forge
+mamba repoquery search opam --channel conda-forge/label/ocaml_experimental
 
 # List packages depending on `opam`:
-mamba repoquery whoneeds opam --channel conda-forge
+mamba repoquery whoneeds opam --channel conda-forge/label/ocaml_experimental
 
 # List dependencies of `opam`:
-mamba repoquery depends opam --channel conda-forge
+mamba repoquery depends opam --channel conda-forge/label/ocaml_experimental
 ```
+
+</details>
 
 
 About conda-forge

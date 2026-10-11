@@ -107,20 +107,23 @@ configure_cross_environment
 
 patch_dune_for_cross
 # patch_ocaml_makefile_config - not needed, cross-compiler uses conda-ocaml-cc wrapper
-patch_opam_makefile_config  # Still needed: opam's Makefile.config has native OCAMLLIB from configure
+# The cross compiler wrappers export the cross OCAMLLIB themselves. Exporting
+# it through Makefile.config also reaches dune's evaluation of OCaml-syntax
+# dune files, which then mixes host and cross stdlib .cmi; on s390x (zstd-free,
+# plain-marshalled .cmi) their CRCs differ -> Persistent_env.Error.
+if [[ "${target_platform}" != "linux-s390x" ]]; then
+  patch_opam_makefile_config
+fi
 clear_build_caches
 
-# DEBUG: Check compiler config after swap
-echo "=== OCaml compiler config after swap ==="
-ocamlc -config | grep -E "^(c_compiler|native_c_compiler|ccomp_type|architecture):"
-
-# Create dune-workspace to force cross-compiler for C code
+# dune-workspace: target headers for C stubs; $PREFIX/lib for OCaml-driven links (-lzstd) and as rpath so helpers like context_flags.exe run under QEMU
 cat > dune-workspace << WORKSPACE_EOF
 (lang dune 3.0)
 (env
   (_
     (c_flags (:standard -I${PREFIX}/include))
-    (cxx_flags (:standard -I${PREFIX}/include))))
+    (cxx_flags (:standard -I${PREFIX}/include))
+    (link_flags (:standard -ccopt -L${PREFIX}/lib -ccopt -Wl,-rpath,${PREFIX}/lib -ccopt -Wl,-rpath-link,${PREFIX}/lib))))
 WORKSPACE_EOF
 
 echo "=== PHASE 4: Main Build ==="

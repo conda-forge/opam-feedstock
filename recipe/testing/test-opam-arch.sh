@@ -60,6 +60,12 @@ case "$(uname -s)" in
             elif readelf -h "${OPAM_BIN}" 2>&1 | grep -qiE "PowerPC"; then
                 echo ""
                 echo "[OK] Binary architecture: PowerPC64"
+            elif readelf -h "${OPAM_BIN}" 2>&1 | grep -qi "RISC-V"; then
+                echo ""
+                echo "[OK] Binary architecture: RISC-V"
+            elif readelf -h "${OPAM_BIN}" 2>&1 | grep -qi "IBM S/390"; then
+                echo ""
+                echo "[OK] Binary architecture: IBM S/390"
             else
                 echo ""
                 echo "[OK] Binary is valid ELF"
