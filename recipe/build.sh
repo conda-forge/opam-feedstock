@@ -123,6 +123,22 @@ else
     export HOME="${OPAM_BUILD_HOME}"
     export USERPROFILE="${OPAM_BUILD_HOME}"
     export OPAMROOT="${OPAM_BUILD_HOME}/.opam"
+    # MSVC ocamlopt runs ml64 through cmd.exe, which stops resolving commands once
+    # PATH nears its ~8191 char limit; vcvars pushes it there. Drop duplicate and
+    # missing dirs, and keep the MSVC bin dir first.
+    if [[ "$(ocamlc -config-var c_compiler 2>/dev/null)" == cl* ]]; then
+      MSVC_BIN_DIR="$(dirname "$(command -v cl.exe)")"
+      _short_path=""
+      IFS=: read -ra _path_dirs <<< "${MSVC_BIN_DIR}:${PATH}"
+      for _d in "${_path_dirs[@]}"; do
+        [[ -d "${_d}" ]] || continue
+        case ":${_short_path}:" in
+          *":${_d}:"*) ;;
+          *) _short_path="${_short_path:+${_short_path}:}${_d}" ;;
+        esac
+      done
+      export PATH="${_short_path}"
+    fi
     # Vendored dune patch only needed if not using external dune
     if [[ -z "${EXTERNAL_DUNE}" ]] && [[ -d "src_ext/dune-local" ]]; then
       patch -p1 -d src_ext/dune-local < "${RECIPE_DIR}/patches/xxxx-fix-dune-which-double-exe-on-windows.patch"
