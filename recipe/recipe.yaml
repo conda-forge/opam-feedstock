@@ -1,5 +1,5 @@
 context:
-  build_number: 101
+  build_number: 102
   name: opam
   version: 2.5.0
 
@@ -107,8 +107,8 @@ outputs:
         # no unzip package for linux-riscv64 / linux-s390x
         - if: unix and not (target_platform == "linux-riscv64" or target_platform == "linux-s390x")
           then: unzip
-        # no bubblewrap package for linux-riscv64 / linux-s390x; opam sandboxing is optional
-        - if: linux and not (target_platform == "linux-riscv64" or target_platform == "linux-s390x")
+        # no bubblewrap package for linux-s390x; opam sandboxing is optional
+        - if: linux and target_platform != "linux-s390x"
           then:
             - bubblewrap
           # Once we have ocaml 5.4.0_1
