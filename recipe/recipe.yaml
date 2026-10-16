@@ -1,5 +1,5 @@
 context:
-  build_number: 102
+  build_number: 2
   name: opam
   version: 2.5.0
 
@@ -7,7 +7,7 @@ context:
   m2: ${{ "m2-" if not unix else "" }}
   sh: ${{ "sh" if unix else "bat" }}
   # ocaml_win-64 ships gcc_* and vs2022_* tracks; follow the c_compiler lane
-  c_toolchain: ${{ "" if unix else ("zig_*" if arm64 else c_compiler ~ "_*") }}
+  c_toolchain: ${{ "" if unix else c_compiler ~ "_*" }}
 
 recipe:
   name: opam-packages
@@ -20,7 +20,7 @@ source:
 
 build:
   number: ${{ build_number }}
-  string: ${{ c_compiler ~ "_" if not unix else "" }}h${{ hash }}_experimental_${{ build_number }}
+  string: ${{ c_compiler ~ "_" if not unix else "" }}h${{ hash }}_${{ build_number }}
   dynamic_linking:
     missing_dso_allowlist:
       - if: not unix
@@ -66,10 +66,14 @@ outputs:
           then: binutils
         - curl
         - git
-        # ocaml_win-arm64 < 116 lacks stack probes
-        - if: win and arm64
-          then: ocaml_${{ target_platform }} ${{ ocaml_compiler_version }}.* ${{ c_toolchain }}[build_number=">=116"]
-          else: ocaml_${{ target_platform }} ${{ ocaml_compiler_version }}.* ${{ c_toolchain }}
+        - ${{ compiler("ocaml") }}
+        # compiler() has no build string; pin the gcc/vs2022/zig track on Windows
+        - if: not unix
+          then: ocaml_${{ target_platform }} ${{ ocaml_compiler_version }}.* ${{ c_toolchain }}
+        # cross lanes build and run a native opam first (man pages, vendored parsers);
+        # the cross compiler no longer pulls in the native one
+        - if: build_platform != target_platform
+          then: ocaml_${{ build_platform }} ${{ ocaml_compiler_version }}.*
         - if: build_platform != target_platform or target_platform == "win-arm64"
           then:
             - python >=3.9
@@ -89,10 +93,15 @@ outputs:
             - lld
             - llvm-tools
       host:
-        # no zstd package for s390x
-        - if: unix and target_platform != "linux-s390x"
+        # the ocaml cross compiler links -lzstd into target executables (e.g.
+        # dune's context_flags helpers); there is no zstd package for s390x
+        - if: build_platform != target_platform and target_platform != "linux-s390x"
           then:
             - zstd
+      ignore_run_exports:
+        # opam itself does not link libzstd
+        by_name:
+          - zstd
       run:
         # c-compiler, curl, git, make, rsync are not yet built for linux-s390x
         - if: target_platform != "linux-s390x"
@@ -111,8 +120,6 @@ outputs:
         - if: linux and target_platform != "linux-s390x"
           then:
             - bubblewrap
-          # Once we have ocaml 5.4.0_1
-          # - ocaml-compiler
     tests:
       # Package contents validation (using brace expansion for conciseness)
       - package_contents:
@@ -159,7 +166,9 @@ outputs:
           requirements:
             run:
               - python >=3.9
-              - ocaml
+              - ocaml ${{ ocaml_compiler_version }}.*
+              - if: not unix
+                then: ocaml_${{ target_platform }} ${{ ocaml_compiler_version }}.* ${{ c_toolchain }}
 
       # Functional tests - native builds OR Linux cross-compile
       # These run opam commands; Linux uses QEMU, macOS cross can't run ARM64
@@ -175,7 +184,9 @@ outputs:
           requirements:
             run:
               - python >=3.9
-              - ocaml
+              - ocaml ${{ ocaml_compiler_version }}.*
+              - if: not unix
+                then: ocaml_${{ target_platform }} ${{ ocaml_compiler_version }}.* ${{ c_toolchain }}
               - ocaml-dune
 
 about:
