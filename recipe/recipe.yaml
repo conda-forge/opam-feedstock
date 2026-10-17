@@ -1,7 +1,7 @@
 context:
-  build_number: 2
+  build_number: 0
   name: opam
-  version: 2.5.0
+  version: "2.5.2"
 
   library: ${{ "Library/" if not unix else "" }}
   m2: ${{ "m2-" if not unix else "" }}
@@ -15,7 +15,7 @@ recipe:
 
 source:
   - url: https://github.com/ocaml/${{ name }}/releases/download/${{ version }}/${{ name }}-full-${{ version }}.tar.gz
-    sha256: 25fb98f962c4227c1261e142afc68a416778e6e819600bd5ee3ec4a18ae1e238
+    sha256: b3623809567f19ed6b5d679b8c7bbc0bdec9418bff4a875ff0799d446d8555c3
     target_directory: opam
 
 build:
@@ -109,10 +109,10 @@ outputs:
             - c-compiler
             - curl
             - git
-        - if: unix and target_platform != "linux-s390x"
-          then:
-            - make
-            - rsync
+            - if: unix
+              then:
+                - make
+                - rsync
         # no unzip package for linux-riscv64 / linux-s390x
         - if: unix and not (target_platform == "linux-riscv64" or target_platform == "linux-s390x")
           then: unzip
@@ -158,36 +158,34 @@ outputs:
       # no python for linux-s390x yet; package_contents and the arch check still run there
       - if: (build_platform == target_platform or linux) and target_platform != "linux-s390x"
         then:
-          script: |
-            python testing/test-opam-version.py
-          files:
-            recipe:
-              - testing/test-opam-version.py
-          requirements:
-            run:
-              - python >=3.9
-              - ocaml ${{ ocaml_compiler_version }}.*
-              - if: not unix
-                then: ocaml_${{ target_platform }} ${{ ocaml_compiler_version }}.* ${{ c_toolchain }}
+          - script: |
+              python testing/test-opam-version.py
+            files:
+              recipe:
+                - testing/test-opam-version.py
+            requirements:
+              run:
+                - python >=3.9
+                - ocaml ${{ ocaml_compiler_version }}.*
+                - if: not unix
+                  then: ocaml_${{ target_platform }} ${{ ocaml_compiler_version }}.* ${{ c_toolchain }}
 
       # Functional tests - native builds OR Linux cross-compile
       # These run opam commands; Linux uses QEMU, macOS cross can't run ARM64
-      - if: (build_platform == target_platform or linux) and target_platform != "linux-s390x"
-        then:
-          script: |
-            python testing/test-opam-functional.py
-            python testing/test-opam-activation.py
-          files:
-            recipe:
-              - testing/test-opam-functional.py
-              - testing/test-opam-activation.py
-          requirements:
-            run:
-              - python >=3.9
-              - ocaml ${{ ocaml_compiler_version }}.*
-              - if: not unix
-                then: ocaml_${{ target_platform }} ${{ ocaml_compiler_version }}.* ${{ c_toolchain }}
-              - ocaml-dune
+          - script: |
+              python testing/test-opam-functional.py
+              python testing/test-opam-activation.py
+            files:
+              recipe:
+                - testing/test-opam-functional.py
+                - testing/test-opam-activation.py
+            requirements:
+              run:
+                - python >=3.9
+                - ocaml ${{ ocaml_compiler_version }}.*
+                - if: not unix
+                  then: ocaml_${{ target_platform }} ${{ ocaml_compiler_version }}.* ${{ c_toolchain }}
+                - ocaml-dune
 
 about:
   homepage: https://github.com/ocaml/opam
