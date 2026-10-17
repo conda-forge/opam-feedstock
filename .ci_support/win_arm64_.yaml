@@ -3,13 +3,15 @@ c_compiler:
 c_stdlib:
 - vs
 channel_sources:
-- conda-forge/label/ocaml_experimental,conda-forge/label/zig_dev,conda-forge
+- conda-forge
 channel_targets:
-- conda-forge ocaml_experimental
+- conda-forge main
 curl:
 - '8'
 cxx_compiler:
 - zig
+ocaml_compiler:
+- ocaml
 ocaml_compiler_version:
 - 5.4.0
 target_platform:

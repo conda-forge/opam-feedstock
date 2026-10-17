@@ -13,9 +13,9 @@ c_stdlib:
 c_stdlib_version:
 - '11.0'
 channel_sources:
-- conda-forge/label/ocaml_experimental,conda-forge
+- conda-forge
 channel_targets:
-- conda-forge ocaml_experimental
+- conda-forge main
 curl:
 - '8'
 cxx_compiler:
@@ -24,6 +24,8 @@ cxx_compiler_version:
 - '21'
 macos_machine:
 - x86_64-apple-darwin13.4.0
+ocaml_compiler:
+- ocaml
 ocaml_compiler_version:
 - 5.4.0
 target_platform:

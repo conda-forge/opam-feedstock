@@ -3,9 +3,9 @@ c_compiler:
 c_stdlib:
 - vs
 channel_sources:
-- conda-forge/label/ocaml_experimental,conda-forge
+- conda-forge
 channel_targets:
-- conda-forge ocaml_experimental
+- conda-forge main
 curl:
 - '8'
 cxx_compiler:
@@ -23,6 +23,8 @@ m2w64_cxx_compiler:
 - gxx
 m2w64_cxx_compiler_version:
 - '15'
+ocaml_compiler:
+- ocaml
 ocaml_compiler_version:
 - 5.4.0
 target_platform:
