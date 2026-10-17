@@ -1,5 +1,3 @@
-disable_ocaml_cross_activation
-
 if is_linux_cross; then
   export CFLAGS="-ftree-vectorize -fPIC -fstack-protector-strong -fno-plt -O3 -pipe -isystem $PREFIX/include"
   export LDFLAGS="-Wl,-O2 -Wl,--sort-common -Wl,--as-needed -Wl,-z,relro -Wl,-z,now -Wl,--allow-shlib-undefined -Wl,-rpath,$PREFIX/lib -Wl,-rpath-link,$PREFIX/lib -L$PREFIX/lib"
@@ -42,7 +40,11 @@ echo "=== PHASE 1: Pre-generate Man Pages ==="
 # This also generates parser files via dune/menhir which we preserve for cross-compile.
 # ==========================================================================
 NATIVE_MAN_DIR="$(pwd)/_native_man"
-generate_native_man_pages "${NATIVE_MAN_DIR}" "${NATIVE_DUNE}"
+# Subshell: native OCaml environment applies to this phase only
+(
+  ocaml_use_native
+  generate_native_man_pages "${NATIVE_MAN_DIR}" "${NATIVE_DUNE}"
+)
 
 # ==========================================================================
 echo "=== PHASE 2: Prepare for Cross-Compilation ==="
@@ -103,7 +105,7 @@ fi
 echo "=== PHASE 3: Cross-Compiler Setup ==="
 # ==========================================================================
 
-swap_ocaml_compilers
+ocaml_use_cross
 setup_cross_c_compilers
 configure_cross_environment
 

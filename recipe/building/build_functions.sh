@@ -231,43 +231,8 @@ get_compiler() {
 # CROSS-COMPILATION SETUP FUNCTIONS
 # ==============================================================================
 
-# ocaml >=16 cross packages auto-activate cross mode (OCAMLLIB, PATH shims).
-# opam drives native vs cross itself, so restore the pre-activation environment.
-disable_ocaml_cross_activation() {
-  if declare -F ocaml_use_native >/dev/null; then
-    ocaml_use_native
-    echo "  OCaml cross auto-activation disabled via ocaml_use_native"
-  else
-    local new_path="" entry
-    local IFS=:
-    for entry in ${PATH}; do
-      case "${entry}" in
-        */ocaml-cross-compilers/*/shims) ;;
-        *) new_path="${new_path:+${new_path}:}${entry}" ;;
-      esac
-    done
-    PATH="${new_path}"
-    export PATH
-    echo "  OCaml cross auto-activation disabled by removing shims from PATH"
-  fi
-  unset OCAML_CROSS_MODE
-}
-
-swap_ocaml_compilers() {
-  echo "  Swapping OCaml compilers to cross-compilers..."
-  pushd "${BUILD_PREFIX}/bin" > /dev/null
-    for tool in ocamlc ocamldep ocamlopt ocamlobjinfo; do
-      if [[ -f "${tool}" ]] || [[ -L "${tool}" ]]; then
-        mv "${tool}" "${tool}.build"
-        ln -sf "${CONDA_TOOLCHAIN_HOST}-${tool}" "${tool}"
-      fi
-      if [[ -f "${tool}.opt" ]] || [[ -L "${tool}.opt" ]]; then
-        mv "${tool}.opt" "${tool}.opt.build"
-        ln -sf "${CONDA_TOOLCHAIN_HOST}-${tool}.opt" "${tool}.opt"
-      fi
-    done
-  popd > /dev/null
-}
+# ocaml >=17 cross packages provide ocaml_use_cross / ocaml_use_native (and
+# auto-activate cross mode when cross-compiling); no compiler symlink swapping.
 
 setup_cross_c_compilers() {
   echo "  Setting up C/C++ cross-compiler symlinks..."

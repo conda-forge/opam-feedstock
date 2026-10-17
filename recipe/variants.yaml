@@ -13,10 +13,9 @@ c_compiler:
   - if: win and arm64
     then: zig
 cxx_compiler:
+  # gcc lane takes C++ from m2w64_cxx; compiler("cxx") is only used with vs2022
   - if: win and x86_64
-    then:
-      - vs2022
-      - gxx
+    then: vs2022
   - if: win and arm64
     then: zig
 # no gcc 15 cross toolchain for s390x yet
