@@ -107,17 +107,26 @@ echo "=== PHASE 3: Cross-Compiler Setup ==="
 
 ocaml_use_cross
 setup_cross_c_compilers
-configure_cross_environment
+# The cross activation leaves the native lib ahead in OCAMLPATH, so dune
+# resolves unix/compiler-libs from $BUILD_PREFIX/lib/ocaml and links them
+# against the cross stdlib (inconsistent assumptions over Stdlib__Sys).
+# Put the cross lib first. Bytecode run on the build machine (dune helpers)
+# still needs the native stublibs.
+OCAML_CROSS_LIB="$(ocamlc -where)"
+export OCAMLPATH="${OCAML_CROSS_LIB}:${BUILD_PREFIX}/lib/ocaml"
+export CAML_LD_LIBRARY_PATH="${BUILD_PREFIX}/lib/ocaml/stublibs"
+echo "  Cross OCaml environment:"
+echo "    ocamlc:  $(command -v ocamlc)  -where: ${OCAML_CROSS_LIB}"
+echo "    ocamlopt arch: $(ocamlopt -config-var architecture 2>/dev/null)"
+echo "    OCAMLLIB=${OCAMLLIB:-<unset>}"
+echo "    OCAMLPATH=${OCAMLPATH}"
+echo "    CAML_LD_LIBRARY_PATH=${CAML_LD_LIBRARY_PATH}"
 
 patch_dune_for_cross
 # patch_ocaml_makefile_config - not needed, cross-compiler uses conda-ocaml-cc wrapper
-# The cross compiler wrappers export the cross OCAMLLIB themselves. Exporting
-# it through Makefile.config also reaches dune's evaluation of OCaml-syntax
-# dune files, which then mixes host and cross stdlib .cmi; on s390x (zstd-free,
-# plain-marshalled .cmi) their CRCs differ -> Persistent_env.Error.
-if [[ "${target_platform}" != "linux-s390x" ]]; then
-  patch_opam_makefile_config
-fi
+# Makefile.config OCAMLLIB is deliberately not patched: a cross OCAMLLIB there
+# reaches dune's evaluation of OCaml-syntax dune files and mixes host and cross
+# stdlib .cmi (CRC mismatch -> Persistent_env.Error).
 clear_build_caches
 
 # dune-workspace: target headers for C stubs; $PREFIX/lib for OCaml-driven links (-lzstd) and as rpath so helpers like context_flags.exe run under QEMU
@@ -132,7 +141,38 @@ WORKSPACE_EOF
 
 echo "=== PHASE 4: Main Build ==="
 
-make CC="${CC}" CXX="${CXX}" AR="${AR}" RANLIB="${RANLIB}" V=1
+echo "=== DIAG: cross dune diagnostics ==="
+(
+  set +e
+  echo "--- tools"
+  for t in ocaml ocamlc ocamlopt ocamlrun ocamlfind dune; do printf '  %-9s %s\n' "$t" "$(command -v $t)"; done
+  ls "$(ocamlc -where)/stublibs" 2>&1 | head -20
+  cat "$(ocamlc -where)/ld.conf" 2>&1
+  echo "--- ocaml toplevel"
+  ocaml -version
+  echo "--- OCaml-syntax dune files"
+  grep -rl --include=dune -e '-\*- tuareg -\*-' . 2>/dev/null | head -20
+  echo "--- dune-workspace / dune-project files above and at root"
+  ls -la dune-workspace* dune-project 2>/dev/null; ls -la .. | grep -i dune
+  echo "--- dune env"; env | grep -E '^(DUNE|OCAML|CAML|INSIDE_DUNE)' | sort
+  echo "--- dune-workspace content"; cat dune-workspace
+  ls -la _build 2>&1 | head
+  echo "--- direct dune build"
+  "${BUILD_PREFIX}/bin/dune" build --profile=release --root . --display short --error-reporting=twice -- opam-installer.install opam.install > /tmp/diag_dune.out 2>&1
+  echo "  dune exit=$?"
+  echo "  output lines: $(wc -l < /tmp/diag_dune.out)"
+  grep -n -iE 'error|exited|signal|fatal|killed|exception|cannot|failed|abort' /tmp/diag_dune.out | head -60
+  echo "--- first error context"
+  n=$(grep -n -m1 -iE '^Error|Error:|exited with|signal' /tmp/diag_dune.out | cut -d: -f1); if [ -n "$n" ]; then sed -n "$((n>25?n-25:1)),$((n+40))p" /tmp/diag_dune.out; fi
+  echo "--- last 40 lines"; tail -n 40 /tmp/diag_dune.out
+  echo "--- build dir"; ls -la _build 2>&1 | head; find / -xdev -path '*_build/log' -mmin -10 2>/dev/null | head
+  tail -n 150 ./_build/log 2>&1
+  echo "--- dune logs found"
+  find . -path '*_build/log' -newer /tmp/diag_ok.ml 2>/dev/null | while read l; do echo "  == $l"; tail -n 120 "$l"; done
+) || true
+echo "=== DIAG end ==="
+
+make CC="${CC}" CXX="${CXX}" AR="${AR}" RANLIB="${RANLIB}" V=1 || { echo "=== dune build failed; tail of _build/log ==="; tail -n 150 "${SRC_DIR}/opam/_build/log" _build/log 2>/dev/null; exit 1; }
 
 # ==========================================================================
 echo "=== PHASE 5: Manual Installation ==="
