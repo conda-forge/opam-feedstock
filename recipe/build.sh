@@ -66,6 +66,11 @@ else
   EXTERNAL_DUNE=""
   if command -v dune &>/dev/null; then
     EXTERNAL_DUNE="$(command -v dune)"
+    # Windows: configure bakes this into the Makefile, and /bin/sh strips the
+    # backslashes of a native path. Use a forward-slash path.
+    if is_non_unix; then
+      EXTERNAL_DUNE="$(cygpath -m "${EXTERNAL_DUNE}")"
+    fi
     echo "  dune: ${EXTERNAL_DUNE}"
   fi
   if command -v cppo &>/dev/null; then
