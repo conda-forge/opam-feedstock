@@ -187,8 +187,8 @@ generate_native_man_pages() {
   echo "Cleaning native _build..."
   rm -rf "${opam_dir}/_build"
 
-  # Note: CONDA_OCAML_* and OCAMLLIB/OCAMLPATH will be set properly by
-  # configure_cross_environment() for the cross-compilation phase
+  # Note: CONDA_OCAML_* and OCAMLLIB/OCAMLPATH are set by ocaml_use_cross
+  # for the cross-compilation phase
 
   echo "Pre-generated man pages:"
   ls -la "${native_man_dir}/"*.1 2>/dev/null | head -10 || echo "  (none generated)"
@@ -231,43 +231,8 @@ get_compiler() {
 # CROSS-COMPILATION SETUP FUNCTIONS
 # ==============================================================================
 
-# ocaml >=16 cross packages auto-activate cross mode (OCAMLLIB, PATH shims).
-# opam drives native vs cross itself, so restore the pre-activation environment.
-disable_ocaml_cross_activation() {
-  if declare -F ocaml_use_native >/dev/null; then
-    ocaml_use_native
-    echo "  OCaml cross auto-activation disabled via ocaml_use_native"
-  else
-    local new_path="" entry
-    local IFS=:
-    for entry in ${PATH}; do
-      case "${entry}" in
-        */ocaml-cross-compilers/*/shims) ;;
-        *) new_path="${new_path:+${new_path}:}${entry}" ;;
-      esac
-    done
-    PATH="${new_path}"
-    export PATH
-    echo "  OCaml cross auto-activation disabled by removing shims from PATH"
-  fi
-  unset OCAML_CROSS_MODE
-}
-
-swap_ocaml_compilers() {
-  echo "  Swapping OCaml compilers to cross-compilers..."
-  pushd "${BUILD_PREFIX}/bin" > /dev/null
-    for tool in ocamlc ocamldep ocamlopt ocamlobjinfo; do
-      if [[ -f "${tool}" ]] || [[ -L "${tool}" ]]; then
-        mv "${tool}" "${tool}.build"
-        ln -sf "${CONDA_TOOLCHAIN_HOST}-${tool}" "${tool}"
-      fi
-      if [[ -f "${tool}.opt" ]] || [[ -L "${tool}.opt" ]]; then
-        mv "${tool}.opt" "${tool}.opt.build"
-        ln -sf "${CONDA_TOOLCHAIN_HOST}-${tool}.opt" "${tool}.opt"
-      fi
-    done
-  popd > /dev/null
-}
+# ocaml >=17 cross packages provide ocaml_use_cross / ocaml_use_native (and
+# auto-activate cross mode when cross-compiling); no compiler symlink swapping.
 
 setup_cross_c_compilers() {
   echo "  Setting up C/C++ cross-compiler symlinks..."
@@ -292,50 +257,6 @@ setup_cross_c_compilers() {
   popd > /dev/null
 }
 
-configure_cross_environment() {
-  echo "  Configuring cross-compilation environment variables..."
-
-  local cross_ocaml_lib="${BUILD_PREFIX}/lib/ocaml-cross-compilers/${CONDA_TOOLCHAIN_HOST}/lib/ocaml"
-  local native_ocaml_lib="${BUILD_PREFIX}/lib/ocaml"
-
-  # CONDA_OCAML_* variables: Required for conda-ocaml-* wrappers
-  # Dune reads tools from ocamlc -config (e.g., c_compiler="conda-ocaml-cc")
-  # and calls them directly. These wrappers need environment variables to know
-  # which actual cross-tools to use. Without these, they fall back to native tools.
-  # macOS uses clang, Linux uses gcc
-  if is_macos; then
-    export CONDA_OCAML_CC="${CONDA_TOOLCHAIN_HOST}-clang"
-  else
-    export CONDA_OCAML_CC="${CONDA_TOOLCHAIN_HOST}-gcc"
-  fi
-  export CONDA_OCAML_AS="${CONDA_TOOLCHAIN_HOST}-as"
-  export CONDA_OCAML_AR="${CONDA_TOOLCHAIN_HOST}-ar"
-  export CONDA_OCAML_LD="${CONDA_TOOLCHAIN_HOST}-ld"
-  if is_macos; then
-    # Suppress linker warnings about deployment target mismatch
-    # (OCaml has 10.13 baked in, but we're building for 11.0+)
-    export LDFLAGS="${LDFLAGS:-} -Wl,-w"
-    export CONDA_OCAML_MKEXE="${CONDA_OCAML_CC}"
-    export CONDA_OCAML_MKDLL="${CONDA_OCAML_CC} -dynamiclib"
-  else
-    export CONDA_OCAML_MKEXE="${CONDA_OCAML_CC} -Wl,-E -ldl"
-    export CONDA_OCAML_MKDLL="${CONDA_OCAML_CC} -shared"
-  fi
-  echo "    CONDA_OCAML_CC: ${CONDA_OCAML_CC}"
-  echo "    CONDA_OCAML_MKEXE: ${CONDA_OCAML_MKEXE}"
-
-  # OCAMLPATH: Dune library discovery (before compiler invocation)
-  # Cross-first so compilation uses cross libs, native-fallback for module resolution
-  export OCAMLPATH="${cross_ocaml_lib}:${native_ocaml_lib}"
-  echo "    OCAMLPATH: ${OCAMLPATH}"
-
-  # CAML_LD_LIBRARY_PATH: Native stubs for dune runtime
-  # Dune (native x86_64) needs native .so stubs, not cross-compiled aarch64 ones
-  local native_stublibs="${native_ocaml_lib}/stublibs"
-  export CAML_LD_LIBRARY_PATH="${native_stublibs}"
-  echo "    CAML_LD_LIBRARY_PATH: ${native_stublibs}"
-}
-
 patch_dune_for_cross() {
   echo "  Patching Dune files for cross-compilation..."
   local native_cppo="${BUILD_PREFIX}/bin/cppo"
@@ -348,7 +269,7 @@ patch_dune_for_cross() {
   done
 
   export MENHIR="${native_menhir}"
-  export PATH="${BUILD_PREFIX}/bin:${PATH}"
+  # BUILD_PREFIX/bin is already on PATH; do not prepend it, it would shadow the ocaml_use_cross shims
   echo "    Native menhir available at: $(which menhir)"
 }
 
@@ -371,20 +292,6 @@ patch_ocaml_makefile_config() {
     grep -E "^(CC|NATIVE_C_COMPILER|BYTECODE_C_COMPILER|PACKLD|ASM|TOOLPREF)=" "${ocaml_config}"
   else
     echo "    WARNING: OCaml Makefile.config not found at ${ocaml_config}"
-  fi
-}
-
-patch_opam_makefile_config() {
-  # Fix OCAMLLIB in opam's Makefile.config to point to cross-compiled libraries
-  # configure captured native OCAMLLIB; we need cross path
-  local makefile_config="${SRC_DIR}/opam/Makefile.config"
-  [[ -f "${makefile_config}" ]] || makefile_config="${SRC_DIR}/Makefile.config"
-
-  if [[ -f "${makefile_config}" ]]; then
-    local cross_ocamllib=$(ocamlc -where)
-    echo "  Patching opam Makefile.config OCAMLLIB to: ${cross_ocamllib}"
-    sed -i "s|^OCAMLLIB = .*|OCAMLLIB = ${cross_ocamllib}|" "${makefile_config}"
-    grep "^OCAMLLIB" "${makefile_config}"
   fi
 }
 
