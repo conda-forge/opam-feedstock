@@ -27,7 +27,7 @@ macos_machine:
 ocaml_compiler:
 - ocaml
 ocaml_compiler_version:
-- 5.4.0
+- 5.4.1
 target_platform:
 - osx-arm64
 zip_keys:
