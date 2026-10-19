@@ -58,9 +58,7 @@ outputs:
         - ${{ m2 }}grep
         - ${{ m2 }}make
         - ${{ m2 }}sed
-        - ocaml-cppo
         - ocaml-dune
-        - ocaml-menhir
         # no binutils package for win-arm64
         - if: not (win and arm64)
           then: binutils
