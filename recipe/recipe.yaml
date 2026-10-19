@@ -20,7 +20,7 @@ source:
 
 build:
   number: ${{ build_number }}
-  string: ${{ c_compiler ~ "_" if not unix else "" }}h${{ hash }}_${{ build_number }}
+  string: ${{ c_compiler ~ "_" if not unix else "" }}h${{ hash }}_experimental_${{ build_number }}
   dynamic_linking:
     missing_dso_allowlist:
       - if: not unix
