@@ -25,3 +25,13 @@ c_compiler_version:
 cxx_compiler_version:
   - if: linux and s390x
     then: "14"
+
+ocaml_compiler_version:
+  - 5.4.1
+
+channel_sources:
+  - conda-forge/label/ocaml_experimental,conda-forge
+
+# Uploads from this branch go to the ocaml_experimental label, not main.
+channel_targets:
+  - conda-forge ocaml_experimental
