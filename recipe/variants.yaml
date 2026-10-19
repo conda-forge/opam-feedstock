@@ -25,3 +25,6 @@ c_compiler_version:
 cxx_compiler_version:
   - if: linux and s390x
     then: "14"
+# DNM: test ocaml 5.4.1 ahead of the migrator
+ocaml_compiler_version:
+  - 5.4.1
