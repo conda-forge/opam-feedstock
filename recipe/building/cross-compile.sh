@@ -40,7 +40,11 @@ echo "=== PHASE 1: Pre-generate Man Pages ==="
 # This also generates parser files via dune/menhir which we preserve for cross-compile.
 # ==========================================================================
 NATIVE_MAN_DIR="$(pwd)/_native_man"
-generate_native_man_pages "${NATIVE_MAN_DIR}" "${NATIVE_DUNE}"
+# Subshell: native OCaml environment applies to this phase only
+(
+  ocaml_use_native
+  generate_native_man_pages "${NATIVE_MAN_DIR}" "${NATIVE_DUNE}"
+)
 
 # ==========================================================================
 echo "=== PHASE 2: Prepare for Cross-Compilation ==="
@@ -101,19 +105,21 @@ fi
 echo "=== PHASE 3: Cross-Compiler Setup ==="
 # ==========================================================================
 
-swap_ocaml_compilers
+ocaml_use_cross
 setup_cross_c_compilers
-configure_cross_environment
+OCAML_CROSS_LIB="$(ocamlc -where)"
+echo "  Cross OCaml environment:"
+echo "    ocamlc:  $(command -v ocamlc)  -where: ${OCAML_CROSS_LIB}"
+echo "    ocamlopt arch: $(ocamlopt -config-var architecture 2>/dev/null)"
+echo "    OCAMLLIB=${OCAMLLIB:-<unset>}"
+echo "    OCAMLPATH=${OCAMLPATH:-<unset>}"
+echo "    CAML_LD_LIBRARY_PATH=${CAML_LD_LIBRARY_PATH:-<unset>}"
 
 patch_dune_for_cross
 # patch_ocaml_makefile_config - not needed, cross-compiler uses conda-ocaml-cc wrapper
-# The cross compiler wrappers export the cross OCAMLLIB themselves. Exporting
-# it through Makefile.config also reaches dune's evaluation of OCaml-syntax
-# dune files, which then mixes host and cross stdlib .cmi; on s390x (zstd-free,
-# plain-marshalled .cmi) their CRCs differ -> Persistent_env.Error.
-if [[ "${target_platform}" != "linux-s390x" ]]; then
-  patch_opam_makefile_config
-fi
+# Makefile.config OCAMLLIB is deliberately not patched: a cross OCAMLLIB there
+# reaches dune's evaluation of OCaml-syntax dune files and mixes host and cross
+# stdlib .cmi (CRC mismatch -> Persistent_env.Error).
 clear_build_caches
 
 # dune-workspace: target headers for C stubs; $PREFIX/lib for OCaml-driven links (-lzstd) and as rpath so helpers like context_flags.exe run under QEMU
@@ -128,7 +134,7 @@ WORKSPACE_EOF
 
 echo "=== PHASE 4: Main Build ==="
 
-make CC="${CC}" CXX="${CXX}" AR="${AR}" RANLIB="${RANLIB}" V=1
+make CC="${CC}" CXX="${CXX}" AR="${AR}" RANLIB="${RANLIB}" V=1 || { echo "=== dune build failed; tail of _build/log ==="; tail -n 150 "${SRC_DIR}/opam/_build/log" _build/log 2>/dev/null; exit 1; }
 
 # ==========================================================================
 echo "=== PHASE 5: Manual Installation ==="

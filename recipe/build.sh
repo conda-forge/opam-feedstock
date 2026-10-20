@@ -6,8 +6,8 @@ IFS=$'\n\t'
 # OPAM Build Script
 # ==============================================================================
 # This script handles both native and cross-compilation builds of opam.
-# For cross-compilation, it builds native tools first (dune, cppo, menhir),
-# then swaps to cross-compilers for the main opam build.
+# For cross-compilation, it uses native tools (dune, cppo, menhir) and a native
+# opam for man pages (ocaml_use_native), then ocaml_use_cross for the main build.
 # ==============================================================================
 
 # Source helper functions
@@ -46,8 +46,8 @@ if is_cross_compile; then
   # Cross-compilation setup for OCaml
   # ==============================================================================
   # When cross-compiling (build_platform != target_platform), we need to:
-  # 1. Build dune with native compiler (it runs on build machine)
-  # 2. Swap to cross-compiler for the main opam build
+  # 1. Generate man pages / parsers with the native OCaml (ocaml_use_native)
+  # 2. Switch to the cross-compiler for the main opam build (ocaml_use_cross)
 
   cd "${SRC_DIR}/opam"
   source "${RECIPE_DIR}"/building/cross-compile.sh
@@ -66,6 +66,11 @@ else
   EXTERNAL_DUNE=""
   if command -v dune &>/dev/null; then
     EXTERNAL_DUNE="$(command -v dune)"
+    # Windows: configure bakes this into the Makefile, and /bin/sh strips the
+    # backslashes of a native path. Use a forward-slash path.
+    if is_non_unix; then
+      EXTERNAL_DUNE="$(cygpath -m "${EXTERNAL_DUNE}")"
+    fi
     echo "  dune: ${EXTERNAL_DUNE}"
   fi
   if command -v cppo &>/dev/null; then

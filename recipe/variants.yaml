@@ -5,9 +5,6 @@ m2w64_c_stdlib_version:
   - if: win and x86_64
     then: "12"
 
-ocaml_compiler_version:
-  - "5.4.0"
-
 c_compiler:
   - if: win and x86_64
     then:
@@ -16,10 +13,9 @@ c_compiler:
   - if: win and arm64
     then: zig
 cxx_compiler:
+  # gcc lane takes C++ from m2w64_cxx; compiler("cxx") is only used with vs2022
   - if: win and x86_64
-    then:
-      - vs2022
-      - gxx
+    then: vs2022
   - if: win and arm64
     then: zig
 # no gcc 15 cross toolchain for s390x yet
@@ -30,10 +26,11 @@ cxx_compiler_version:
   - if: linux and s390x
     then: "14"
 
+ocaml_compiler_version:
+  - 5.4.1
+
 channel_sources:
-  - if: win and arm64
-    then: conda-forge/label/ocaml_experimental,conda-forge/label/zig_dev,conda-forge
-    else: conda-forge/label/ocaml_experimental,conda-forge
+  - conda-forge/label/ocaml_experimental,conda-forge
 
 # Uploads from this branch go to the ocaml_experimental label, not main.
 channel_targets:
