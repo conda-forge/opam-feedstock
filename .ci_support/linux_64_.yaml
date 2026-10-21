@@ -23,7 +23,7 @@ docker_image:
 ocaml_compiler:
 - ocaml
 ocaml_compiler_version:
-- 5.4.1
+- 5.5.1
 target_platform:
 - linux-64
 zip_keys:
