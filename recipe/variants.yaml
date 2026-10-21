@@ -27,7 +27,7 @@ cxx_compiler_version:
     then: "14"
 
 ocaml_compiler_version:
-  - 5.4.1
+  - 5.5.1
 
 channel_sources:
   - conda-forge/label/ocaml_experimental,conda-forge

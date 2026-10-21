@@ -25,6 +25,6 @@ m2w64_cxx_compiler_version:
 ocaml_compiler:
 - ocaml
 ocaml_compiler_version:
-- 5.4.1
+- 5.5.1
 target_platform:
 - win-64
