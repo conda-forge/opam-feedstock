@@ -1,5 +1,5 @@
 context:
-  build_number: 0
+  build_number: 1
   name: opam
   version: "2.6.1"
 
@@ -70,15 +70,12 @@ outputs:
         # compiler() has no build string; pin the gcc/vs2022/zig track on Windows
         - if: not unix
           then: ocaml_${{ target_platform }} ${{ ocaml_compiler_version }}.* ${{ c_toolchain }}
-        # the build_number>=18 floor (ocaml_use_cross/ocaml_use_native, standalone
-        # cross ocaml) applies to cross lanes only
         # cross lanes build and run a native opam first (man pages, vendored parsers);
         # the cross compiler no longer pulls in the native one
-        # build 18: cross toplevel can #load unix.cma, cross lib first on OCAMLPATH
         - if: build_platform != target_platform
           then:
-            - ocaml_${{ build_platform }} ${{ ocaml_compiler_version }}.*[build_number=">=18"]
-            - ocaml_${{ target_platform }} ${{ ocaml_compiler_version }}.*[build_number=">=18"]
+            - ocaml_${{ build_platform }} ${{ ocaml_compiler_version }}.*
+            - ocaml_${{ target_platform }} ${{ ocaml_compiler_version }}.*
         - if: build_platform != target_platform or target_platform == "win-arm64"
           then:
             - python >=3.9
