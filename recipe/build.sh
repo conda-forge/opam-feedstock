@@ -160,19 +160,19 @@ else
   make install
 fi
 
-echo "=== PHASE 4: Install Activation Scripts ==="
-# Install conda activation/deactivation scripts for opam integration
-ACTIVATE_DIR="${PREFIX}/etc/conda/activate.d"
-DEACTIVATE_DIR="${PREFIX}/etc/conda/deactivate.d"
-mkdir -p "${ACTIVATE_DIR}" "${DEACTIVATE_DIR}"
+echo "=== PHASE 4: Install Activation Env Vars ==="
+# static env vars applied by conda on activate and unset on deactivate
+ENV_VARS_DIR="${PREFIX}/etc/conda/env_vars.d"
+mkdir -p "${ENV_VARS_DIR}"
 
 if is_linux || is_macos; then
-  cp "${RECIPE_DIR}/activation/activate.sh" "${ACTIVATE_DIR}/opam-activate.sh"
-  cp "${RECIPE_DIR}/activation/deactivate.sh" "${DEACTIVATE_DIR}/opam-deactivate.sh"
+  OPAM_ROOT_JSON="${OPAM_INSTALL_PREFIX}/share/opam"
 else
-  cp "${RECIPE_DIR}/activation/activate.bat" "${ACTIVATE_DIR}/opam-activate.bat"
-  cp "${RECIPE_DIR}/activation/deactivate.bat" "${DEACTIVATE_DIR}/opam-deactivate.bat"
+  # forward slashes keep the json value free of backslash escapes
+  OPAM_ROOT_JSON="$(cygpath -m "${OPAM_INSTALL_PREFIX}")/share/opam"
 fi
+printf '{"OPAMROOT": "%s", "OPAMSWITCH": "conda", "OPAMNOENVNOTICE": "true"}\n' \
+  "${OPAM_ROOT_JSON}" > "${ENV_VARS_DIR}/opam.json"
 
 echo "=== PHASE 5: Initialize opam root ==="
 OPAMROOT="${OPAM_INSTALL_PREFIX}/share/opam"

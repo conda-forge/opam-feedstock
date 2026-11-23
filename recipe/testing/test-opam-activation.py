@@ -84,6 +84,11 @@ def apply_ocaml_530_workaround():
     print(f"OCAMLRUNPARAM: {os.environ.get('OCAMLRUNPARAM', '<default>')}")
 
 
+def normalise_path(path):
+    """Normalise a path for comparison: slash direction, and case on Windows."""
+    return os.path.normcase(os.path.normpath(path))
+
+
 def check_env(name, expected):
     """Check an environment variable has the expected value."""
     actual = os.environ.get(name, "")
@@ -126,7 +131,13 @@ def main():
     print(f"OPAMNOENVNOTICE: {os.environ.get('OPAMNOENVNOTICE', '<not set>')}")
 
     all_ok = True
-    all_ok &= check_env("OPAMROOT", expected_root)
+    # env_vars.d json may write forward slashes on Windows; compare normalised paths
+    actual_root = os.environ.get("OPAMROOT", "")
+    if normalise_path(actual_root) != normalise_path(expected_root):
+        print(f"[FAIL] OPAMROOT mismatch: expected '{expected_root}', got '{actual_root}'")
+        all_ok = False
+    else:
+        print(f"[OK] OPAMROOT is correct: {actual_root}")
     all_ok &= check_env("OPAMSWITCH", "conda")
     all_ok &= check_env("OPAMNOENVNOTICE", "true")
 

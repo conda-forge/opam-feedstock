@@ -1,5 +1,5 @@
 context:
-  build_number: 102
+  build_number: 2
   name: opam
   version: "2.6.1"
 
@@ -20,7 +20,7 @@ source:
 
 build:
   number: ${{ build_number }}
-  string: ${{ c_compiler ~ "_" if not unix else "" }}h${{ hash }}_experimental_${{ build_number }}
+  string: ${{ c_compiler ~ "_" if not unix else "" }}h${{ hash }}_${{ build_number }}
   dynamic_linking:
     missing_dso_allowlist:
       - if: not unix
@@ -137,8 +137,7 @@ outputs:
             - opam-installer
           files:
             - ${{ library }}share/man/man1/opam*
-            - etc/conda/activate.d/opam-activate.${{ sh }}
-            - etc/conda/deactivate.d/opam-deactivate.${{ sh }}
+            - etc/conda/env_vars.d/opam.json
             - ${{ library }}share/opam/conda/.opam-switch/{environment,lock,switch-config}
             - ${{ library }}share/opam/{config,config.lock,lock}
             - ${{ library }}share/opam/opam-init/complete.{sh,zsh}
@@ -160,6 +159,20 @@ outputs:
               - if: linux
                 then:
                   - binutils
+
+      # Activation env vars (from etc/conda/env_vars.d/opam.json) - every lane
+      - if: unix
+        then:
+          script:
+            - test "$OPAMROOT" = "$PREFIX/share/opam"
+            - test "$OPAMSWITCH" = conda
+            - test "$OPAMNOENVNOTICE" = true
+        else:
+          script:
+            - set "_R=%OPAMROOT:/=\%"
+            - if /I not "%_R%"=="%PREFIX%\Library\share\opam" exit 1
+            - if not "%OPAMSWITCH%"=="conda" exit 1
+            - if not "%OPAMNOENVNOTICE%"=="true" exit 1
 
       # Version check - native builds OR Linux cross-compile (QEMU/binfmt available)
       # macOS cross-compile: can't run ARM64 binaries, skip this test

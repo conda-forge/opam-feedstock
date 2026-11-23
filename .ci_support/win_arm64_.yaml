@@ -3,9 +3,9 @@ c_compiler:
 c_stdlib:
 - vs
 channel_sources:
-- conda-forge/label/ocaml_vs,conda-forge
+- conda-forge
 channel_targets:
-- conda-forge ocaml_vs
+- conda-forge main
 curl:
 - '8'
 ocaml_compiler:
